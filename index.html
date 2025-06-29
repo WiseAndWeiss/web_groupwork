@@ -3,9 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!--为了实现太阳系，导入Three.js和OrbitControls.js-->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
     <title>Document</title>
+    <script src="index.js"></script>
+    <script type="module" src="solar_system.js"></script>
 </head>
 <body>
-    <div>hello world!hello world</div>
+    <canvas id="c">aaa</canvas>
 </body>
 </html>
+
+<script>
+    
+
+    function init() {
+        //1.初始化操作；包括场景、相机、渲染器的初始化
+        //场景的初始化
+        const scene = new THREE.Scene();
+        //相机的初始化
+        const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
+        const aspect = window.innerWidth / window.innerHeight;  // 宽高比
+        const near = 0.1; //可绘区域的近点
+        const far = 1000; //可绘区域的远点
+        const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+        camera.position.z = 15;
+        //渲染器的初始化
+        const canvas = document.querySelector('#c');
+        const renderer = new THREE.WebGLRenderer({antialias: true, canvas});
+        renderer.setSize(window.innerWidth,window.innerHeight);
+
+        //2.添加光源
+         const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        //3.添加地球、太阳、月球
+        
+        const textureLoader = new THREE.TextureLoader();
+        //添加地球
+        const earthGeometry = new THREE.SphereGeometry(5, 64, 64); //几何体：球体，参数为半径、经度分段、纬度分段 
+        const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
+        const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //材质
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        scene.add(earth);        
+        //添加月球
+        const moonGeometry = new THREE.SphereGeometry(2, 64, 64); //
+        const moonTexture = textureLoader.load('./texture/moon.jpg');   
+        const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
+        const moon = new THREE.Mesh(moonGeometry, earthMaterial);
+        scene.add(moon);        
+        //添加太阳
+
+        function render() {
+            earth.rotation.y += 0.001;
+            renderer.render(scene,camera);//每次更新页面都要刷新显示
+            requestAnimationFrame( render);
+        }
+
+         // 5. 添加交互控制（鼠标拖拽缩放）
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 启用阻尼感
+        requestAnimationFrame( render );
+    }   
+
+    init();
+
+    
+</script>
