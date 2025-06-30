@@ -7,15 +7,21 @@
     <!--为了实现太阳系，导入Three.js和OrbitControls.js-->
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script> 
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <title>Document</title>
     <script type="module" src="./index.js"></script>
+    <link href="./index.css" rel="stylesheet" type="text/css"></link>
+    <title>Document</title>
+    
 </head>
 <body>
     <canvas id="c"></canvas>
-    <ul>
+    <ul id="ul-view_control">
         <input type="button" id="button-vertical_camera">俯视图
         <input type="button" id="button-horizontal_camera">侧视图
         <input type="button" id="button-free_camera">自由视角
+    </ul>
+    <ul id="ul-move_control">
+        <input type="checkbox" id="checkbox-rotation">停止自转
+        <input type="checkbox" id="checkbox-revolution">停止公转
     </ul>
     
 </body>

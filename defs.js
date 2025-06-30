@@ -20,5 +20,6 @@ export const CONSTS = {
 };
 
 export let CONFIGS = {
-    
+    isRotation: true,
+    isRevolution: true,
 }

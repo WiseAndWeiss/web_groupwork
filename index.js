@@ -1,7 +1,14 @@
 import {CONSTS,CONFIGS} from './defs.js';
+let raycaster = new THREE.Raycaster();
+let pointer = new THREE.Vector2();
+let currentCamera;
+let scene,renderer;
+let objects = [];
+let sun,earth,moon;
+
 //相机参数
 const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
-const aspect = (window.outerWidth / window.outerHeight);  // 宽高比
+const aspect = (window.innerWidth / window.innerHeight);  // 宽高比
 const near = 0.1; //可绘区域的近点
 const far = 1000; //可绘区域的远点
 //自由相机的初始化
@@ -16,17 +23,17 @@ verticalCamera.lookAt(0, 0, 0);
 const horizontalCamera = new THREE.PerspectiveCamera(fov,aspect,near,far);
 horizontalCamera.position.set(0, 0, 150);
 
-let currentCamera = freeCamera
+currentCamera = freeCamera;
 
 function init() {
     //1.初始化操作；包括场景渲染器的初始化
     //场景的初始化
-    const scene = new THREE.Scene();
+    scene = new THREE.Scene();
 
     //渲染器的初始化
     const canvas = document.querySelector('#c');
-    const renderer = new THREE.WebGLRenderer({antialias: true, canvas});
-    renderer.setSize(window.outerWidth - 300,window.outerHeight - 150);
+    renderer = new THREE.WebGLRenderer({antialias: true, canvas});
+    renderer.setSize(window.innerWidth,window.innerHeight);
 
     //2.添加光源：以太阳为中心的点光源
     const ambientLight = new THREE.AmbientLight(0x404040);
@@ -40,13 +47,13 @@ function init() {
     const sunGeometry = new THREE.SphereGeometry(CONSTS.SUN_RADIUS,CONSTS.SPHERE_SEGS,CONSTS.SPHERE_SEGS);
     const sunTexture = textureLoader.load('./texture/sun.jpg');
     const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
-    const sun = new THREE.Mesh(sunGeometry,sunMaterial);
+    sun = new THREE.Mesh(sunGeometry,sunMaterial);
     scene.add(sun);//太阳直接位于正中间
     //添加地球
     const earthGeometry = new THREE.SphereGeometry(CONSTS.EARTH_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); //几何体：球体，参数为半径、经度分段、纬度分段 
     const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
     const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //设置材质和放射颜色
-    const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+    earth = new THREE.Mesh(earthGeometry, earthMaterial);
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -70,45 +77,120 @@ function init() {
     const moonGeometry = new THREE.SphereGeometry(CONSTS.MOON_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); 
     const moonTexture = textureLoader.load('./texture/moon.jpg');  
     const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
-    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon = new THREE.Mesh(moonGeometry, moonMaterial);
     moon.position.x = CONSTS.MOON_ORBIT_RADIUS;//月球相对月球轨道中心的偏移
     moonOrbit.add(moon);
+    //添加星体到Objects里
+    objects.push(sun,earth,moon);
 
     //4.动画效果：包括公转、自转等
-    function render(time) { 
+    function render() { 
         renderer.render(scene,currentCamera);//每次更新页面都要刷新显示
         requestAnimationFrame( render);
         //处理自转
-        sun.rotation.y += CONSTS.SUN_ROTATION;
-        earth.rotation.z += CONSTS.EARTH_ROTATION;
-        moon.rotation.z += CONSTS.MOON_ROTATION;
+        if(CONFIGS.isRotation)
+        {
+            sun.rotation.y += CONSTS.SUN_ROTATION;
+            earth.rotation.z += CONSTS.EARTH_ROTATION;
+            moon.rotation.z += CONSTS.MOON_ROTATION;
+        }
         //处理公转
-        earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
-        moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
+        if(CONFIGS.isRevolution)
+        { 
+            earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
+            moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
+        }
+        
     }
     requestAnimationFrame( render );
 
     // 5. 添加交互控制（鼠标拖拽缩放）
     const controls = new THREE.OrbitControls(currentCamera, renderer.domElement);
     controls.enableDamping = true; // 启用阻尼感
-}   
 
-document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
+    // 6. 添加其它函数
+    //页面大小改变时：重新设置大小
+    function onWindowResize() {
+        currentCamera.aspect = window.innerWidth / window.innerHeight;
+        currentCamera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
     //按下按钮切换为俯视图
     function onVerticalCameraButtonClick(){ 
         currentCamera = verticalCamera;
+        currentCamera.aspect = window.innerWidth / window.innerHeight;
+        currentCamera.updateProjectionMatrix();
     }
-    document.querySelector("#button-vertical_camera").addEventListener('click', onVerticalCameraButtonClick);
     //按下按钮切换为侧视图
     function onHorizontalCameraButtonClick(){
         currentCamera = horizontalCamera;
+        currentCamera.aspect = window.innerWidth / window.innerHeight;
+        currentCamera.updateProjectionMatrix();
     }
-    document.querySelector("#button-horizontal_camera").addEventListener('click',onHorizontalCameraButtonClick);
     //按下按钮切换为自由视角
     function onFreeCameraButtonClick(){
         currentCamera = freeCamera;
+        currentCamera.aspect = window.innerWidth / window.innerHeight;
+        currentCamera.updateProjectionMatrix();
     }
-    document.querySelector("#button-free_camera").addEventListener('click',onFreeCameraButtonClick);
-})
+    //弹窗：弹出换肤界面
+    function onIntersect(object){
+        console.log("onIntersect");
+        if(object instanceof THREE.Mesh){
+            if(object instanceof THREE.SphereGeometry){
+                alert("球体");
+            }
+        }
+    }
+    //鼠标点击：判断是否和星球相交，如果相交触发事件
+    function onMouseClick(event){
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        raycaster.setFromCamera(pointer, currentCamera);
+        const intersects = raycaster.intersectObjects (objects);
+        if ( intersects.length > 0 ) {//如果有点击到物体，只取第一个点击到的
+            onIntersect(intersects[0]);
+        }
+        console.log("点击！");  
+    }
+    //自转的checkbox
+    function onRotationCheckboxClick(checkbox){
+        if(CONFIGS.isRotation == true){
+            CONFIGS.isRotation = false;
+        }
+        else{
+            CONFIGS.isRotation = true;
+        }
+    }
+    //公转的checkbox
+    function onRevolutionCheckboxClick(checkbox){
+        if(CONFIGS.isRevolution == true){
+            CONFIGS.isRevolution = false;
+        }
+        else{
+            CONFIGS.isRevolution = true;
+        }
+    }
+    // 7. 添加事件控制
+    document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
+
+        window.addEventListener('resize',onWindowResize);
+        
+        document.querySelector("#button-vertical_camera").addEventListener('click', onVerticalCameraButtonClick);
+        
+        document.querySelector("#button-horizontal_camera").addEventListener('click',onHorizontalCameraButtonClick);
+        
+        document.querySelector("#button-free_camera").addEventListener('click',onFreeCameraButtonClick);
+
+        document.querySelector("#checkbox-rotation").addEventListener('click',onRotationCheckboxClick);
+
+        document.querySelector("#checkbox-revolution").addEventListener('click',onRevolutionCheckboxClick);
+
+        document.addEventListener('click', onMouseClick);
+    })
+}   
+
+
 
 init();
