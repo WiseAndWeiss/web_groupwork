@@ -1,4 +1,15 @@
 export const CONSTS = {
+    //精细度
+    SPHERE_SEGS: 64,
+    TORUS_SEGS: 64,
+    //半径数据
+    SUN_RADIUS: 20,
+    EARTH_RADIUS: 5,
+    MOON_RADIUS: 2,
+    //轨道数据
+    EARTH_ORBIT_RADIUS: 100,
+    MOON_ORBIT_RADIUS: 12,
+    ORBIT_WIDTH: 0.2, 
     //自转数据
     SUN_ROTATION: 0.001,
     EARTH_ROTATION: 0.01,
