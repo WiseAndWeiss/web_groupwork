@@ -1,0 +1,99 @@
+import {CONSTS,CONFIGS} from './defs.js';
+function init() {
+    //1.初始化操作；包括场景、相机、渲染器的初始化
+    //场景的初始化
+    const scene = new THREE.Scene();
+    //相机的初始化
+    const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
+    const aspect = (window.outerWidth / window.outerHeight);  // 宽高比
+    const near = 0.1; //可绘区域的近点
+    const far = 1000; //可绘区域的远点
+    const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    camera.position.z = 150;
+    //垂直相机的初始化
+    const verticalCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    verticalCamera.position.set(0, 150, 0);
+    verticalCamera.up.set(0, 0, 1);
+    verticalCamera.lookAt(0, 0, 0);
+    //渲染器的初始化
+    const canvas = document.querySelector('#c');
+    const renderer = new THREE.WebGLRenderer({antialias: true, canvas});
+    renderer.setSize(window.outerWidth - 300,window.outerHeight - 150);
+
+    //2.添加光源：以太阳为中心的点光源
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+    const pointLight = new THREE.PointLight(0xffffff, 2);//光照的颜色和亮度
+    scene.add(pointLight);
+
+    //3.添加地球、太阳、月球
+    const textureLoader = new THREE.TextureLoader();
+    //添加太阳
+    const sunGeometry = new THREE.SphereGeometry(CONSTS.SUN_RADIUS,CONSTS.SPHERE_SEGS,CONSTS.SPHERE_SEGS);
+    const sunTexture = textureLoader.load('./texture/sun.jpg');
+    const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
+    const sun = new THREE.Mesh(sunGeometry,sunMaterial);
+    scene.add(sun);//太阳直接位于正中间
+    //添加地球
+    const earthGeometry = new THREE.SphereGeometry(CONSTS.EARTH_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); //几何体：球体，参数为半径、经度分段、纬度分段 
+    const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
+    const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //设置材质和放射颜色
+    const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+    //添加地球轨道(用于公转操作)
+    const earthOrbitGeometry = 
+        new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
+    const OrbitMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+    const earthOrbit = new THREE.Mesh(earthOrbitGeometry,OrbitMaterial);
+    earthOrbit.rotation.x = Math.PI / 2;
+    scene.add(earthOrbit); 
+    //添加地月系统(需要保证地球公转和自转相互不干扰，必须设置这样的系统)
+    const earthSystem = new THREE.Object3D();
+    earthOrbit.add(earthSystem);
+    earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
+    earthSystem.add(earth);
+    //添加月球轨道
+    const moonOrbitGeometry = 
+        new THREE.TorusGeometry(CONSTS.MOON_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
+    const moonOrbit = new THREE.Mesh(moonOrbitGeometry,OrbitMaterial);
+    moonOrbit.rotation.z = Math.PI / 2; // 关键修改：绕X轴旋转90度
+    earthSystem.add(moonOrbit);
+    //moonOrbit.position.x = 0;轨道中心在地月系统的中心
+    //添加月球
+    const moonGeometry = new THREE.SphereGeometry(CONSTS.MOON_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); 
+    const moonTexture = textureLoader.load('./texture/moon.jpg');  
+    const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.position.x = CONSTS.MOON_ORBIT_RADIUS;//月球相对月球轨道中心的偏移
+    moonOrbit.add(moon);
+
+    //4.动画效果：包括公转、自转等
+    function render(time) { 
+        renderer.render(scene,camera);//每次更新页面都要刷新显示
+        requestAnimationFrame( render);
+        //处理自转
+        sun.rotation.y += CONSTS.SUN_ROTATION;
+        earth.rotation.z += CONSTS.EARTH_ROTATION;
+        moon.rotation.z += CONSTS.MOON_ROTATION;
+        //处理公转
+        earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
+        moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
+    }
+    requestAnimationFrame( render );
+
+    // 5. 添加交互控制（鼠标拖拽缩放）
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // 启用阻尼感
+}   
+
+document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
+    function onVerticalCameraButtonClick(){ //按下按钮切换上帝视角
+        if(CONFIGS.isGodView === false){
+            console.log("false!");
+        }
+    }
+    
+    document.querySelector("#button-vertical_camera").addEventListener('click', onVerticalCameraButtonClick)
+
+})
+
+init();

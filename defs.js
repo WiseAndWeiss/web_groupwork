@@ -1,7 +1,7 @@
 export const CONSTS = {
     //精细度
     SPHERE_SEGS: 64,
-    TORUS_SEGS: 64,
+    TORUS_SEGS: 128,
     //半径数据
     SUN_RADIUS: 20,
     EARTH_RADIUS: 5,
@@ -18,3 +18,7 @@ export const CONSTS = {
     EARTH_REVOLUTION: 0.002,
     MOON_REVOLUTION: 0.005,
 };
+
+export let CONFIGS = {
+    
+}
