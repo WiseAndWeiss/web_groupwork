@@ -9,9 +9,9 @@ let controls;
 let focusedObject;
 let originalTarget = new THREE.Vector3(); // 原始目标：原点
 let cameraOffset = new THREE.Vector3();
-let originalDistance = 0;
 let isUserInteracting = false;
 let lastUpdateTime = 0;
+let currentTexture;
 
 //相机参数
 const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
@@ -55,12 +55,14 @@ function init() {
     const sunTexture = textureLoader.load('./texture/sun.jpg');
     const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
     sun = new THREE.Mesh(sunGeometry,sunMaterial);
+    sun.name = "太阳";
     scene.add(sun);//太阳直接位于正中间
     //添加地球
     const earthGeometry = new THREE.SphereGeometry(CONSTS.EARTH_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); //几何体：球体，参数为半径、经度分段、纬度分段 
     const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
     const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //设置材质和放射颜色
     earth = new THREE.Mesh(earthGeometry, earthMaterial);
+    earth.name = "地球";
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -85,6 +87,7 @@ function init() {
     const moonTexture = textureLoader.load('./texture/moon.jpg');  
     const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
     moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.name = "月球";
     moon.position.x = CONSTS.MOON_ORBIT_RADIUS;//月球相对月球轨道中心的偏移
     moonOrbit.add(moon);
     //添加星体到Objects里
@@ -150,23 +153,33 @@ function init() {
         console.log("onIntersect");
         //如果点击的是当前聚焦的对象：取消聚焦，恢复原本的聚焦目标
         if(focusedObject === object){
+            //恢复原本的聚焦目标
             controls.target.copy(originalTarget);
             focusedObject = null;
-            controls.enableDamping = true; // 恢复阻尼效果
-            return;
+            // 恢复阻尼效果
+            controls.enableDamping = true; 
+            //更新名称显示
+            updatePlanetName("无");
         }
-        //否则，获取对象坐标和距离
-        const objectPosition = new THREE.Vector3();
-        object.getWorldPosition(objectPosition); 
-        originalTarget.copy(controls.target);//需要保存原本的目标
-        originalDistance = currentCamera.position.distanceTo(objectPosition);
-        //计算位置偏移量（用于让相机保持与聚焦物体相对静止）
-        cameraOffset = currentCamera.position.clone().sub(objectPosition);
-        //设置聚焦目标为该对象
-        focusedObject = object;
-        controls.target.copy(objectPosition);
-        //取消阻尼效果
-        controls.enableDamping = false;
+        else{ //否则，获取对象坐标和距离     
+            const objectPosition = new THREE.Vector3();
+            object.getWorldPosition(objectPosition); 
+            originalTarget.copy(controls.target);//需要保存原本的目标
+            //计算位置偏移量（用于让相机保持与聚焦物体相对静止）
+            cameraOffset = currentCamera.position.clone().sub(objectPosition);
+            //设置聚焦目标为该对象
+            focusedObject = object;
+            controls.target.copy(objectPosition);
+            //取消阻尼效果
+            controls.enableDamping = false;
+            //更新名称显示
+            updatePlanetName(object.name);
+        }
+        
+    }
+    //显示当前星球的名字 
+    function updatePlanetName(name){
+        document.querySelector("#focused_name").textContent = name;
     }
     //控制器变化时，视角也要变化
     function onControlsChange(){
@@ -233,6 +246,31 @@ function init() {
             CONFIGS.isRevolution = true;
         }
     }
+    //从本地选择材质的按钮
+    function onSkinFileChange(event){
+        //只选择第一个文件
+        const file = event.target.files[0];
+        if(!file)return;
+        //检验是否是图片
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        if(!imageExtensions.includes(fileExtension)){
+            alert("文件不是图片类型！");
+            return;
+        }
+        currentTexture = URL.createObjectURL(file);
+        console.log(currentTexture);
+    }
+    //将当前材质运用到当前星球
+    function onSkinChangeButtonClick(){
+        if(!focusedObject){
+            return;
+        }
+        //加载currentTexture到focusedObject的材质
+        const texture = textureLoader.load(currentTexture);
+        const newMaterial = new THREE.MeshPhongMaterial({ map: texture });
+        focusedObject.material = newMaterial;
+    }
     // 7. 添加事件控制
     document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
 
@@ -247,6 +285,10 @@ function init() {
         document.querySelector("#checkbox-rotation").addEventListener('click',onRotationCheckboxClick);
 
         document.querySelector("#checkbox-revolution").addEventListener('click',onRevolutionCheckboxClick);
+
+        document.querySelector("#file-skin").addEventListener('change',onSkinFileChange);
+
+        document.querySelector("#button-skin_change").addEventListener('click',onSkinChangeButtonClick);
 
         document.addEventListener('click', onMouseClick);
 
