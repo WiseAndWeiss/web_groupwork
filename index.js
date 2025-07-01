@@ -10,6 +10,8 @@ let focusedObject;
 let originalTarget = new THREE.Vector3(); // 原始目标：原点
 let cameraOffset = new THREE.Vector3();
 let originalDistance = 0;
+let isUserInteracting = false;
+let lastUpdateTime = 0;
 
 //相机参数
 const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
@@ -90,17 +92,23 @@ function init() {
 
     //4.动画效果：包括公转、自转等
     function render() { 
+        const now = Date.now();
+        scene.updateMatrixWorld(true);
         //处理聚焦物体
         if(focusedObject){
             //视角锁定
             const focusedPosition = new THREE.Vector3();
             focusedObject.getWorldPosition(focusedPosition);
             controls.target.copy(focusedPosition);
-            //视角跟随
+            //每个一定时间，更新视角跟随
+            if (!isUserInteracting || now - lastUpdateTime > CONSTS.UPDATE_INTERVAL) {
+                cameraOffset = currentCamera.position.clone().sub(focusedPosition);
+                lastUpdateTime = now;
+            }
             currentCamera.position.copy(focusedPosition).add(cameraOffset);
-            //最后还需要update
-            controls.update();
         }
+        //最后还需要update
+        controls.update();
         //处理自转
         if(CONFIGS.isRotation)
         {
@@ -122,7 +130,7 @@ function init() {
 
     // 5. 添加交互控制（鼠标拖拽缩放）
     controls = new THREE.OrbitControls(currentCamera, renderer.domElement);
-    controls.enableDamping = false; // 启用阻尼感
+    controls.enableDamping = true; // 启用阻尼感
 
     // 6. 添加其它函数
     //鼠标点击：判断是否和星球相交，如果相交触发事件
@@ -144,6 +152,7 @@ function init() {
         if(focusedObject === object){
             controls.target.copy(originalTarget);
             focusedObject = null;
+            controls.enableDamping = true; // 恢复阻尼效果
             return;
         }
         //否则，获取对象坐标和距离
@@ -156,6 +165,31 @@ function init() {
         //设置聚焦目标为该对象
         focusedObject = object;
         controls.target.copy(objectPosition);
+        //取消阻尼效果
+        controls.enableDamping = false;
+    }
+    //控制器变化时，视角也要变化
+    function onControlsChange(){
+        if (focusedObject) {
+            isUserInteracting = true;
+            // 更新偏移向量
+            const focusedPosition = new THREE.Vector3();
+            focusedObject.getWorldPosition(focusedPosition);
+            cameraOffset = currentCamera.position.clone().sub(focusedPosition);
+            //缩放距离限制：不能过近也不能过远
+            const dist = cameraOffset.length();
+            if(dist < CONSTS.MIN_CAMERA_DISTANCE){
+                cameraOffset.normalize().multiplyScalar(CONSTS.MIN_CAMERA_DISTANCE); //过近，限制为最近距离
+                currentCamera.position.copy(focusedPosition).add(cameraOffset);
+            }
+            else if(dist > CONSTS.MAX_CAMERA_DISTANCE){
+                cameraOffset.normalize().multiplyScalar(CONSTS.MAX_CAMERA_DISTANCE); //过远，限制为最远距离
+                currentCamera.position.copy(focusedPosition).add(cameraOffset);
+            }
+        }
+    }
+    function onControlsEnd(){
+        isUserInteracting = false;
     }
     //页面大小改变时：重新设置大小
     function onWindowResize() {
@@ -215,9 +249,11 @@ function init() {
         document.querySelector("#checkbox-revolution").addEventListener('click',onRevolutionCheckboxClick);
 
         document.addEventListener('click', onMouseClick);
+
+        controls.addEventListener('change', onControlsChange);
+
+        controls.addEventListener('end', onControlsEnd);
     })
 }   
-
-
 
 init();

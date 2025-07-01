@@ -2,6 +2,8 @@ export const CONSTS = {
     //最小、最大缩放距离限制
     MIN_CAMERA_DISTANCE: 1,
     MAX_CAMERA_DISTANCE: 1000,
+    //交互时画面更新间隔
+    UPDATE_INTERVAL: 50,
     //精细度
     SPHERE_SEGS: 64,
     TORUS_SEGS: 128,
