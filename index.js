@@ -5,6 +5,11 @@ let currentCamera;
 let scene,renderer;
 let objects = [];
 let sun,earth,moon;
+let controls;
+let focusedObject;
+let originalTarget = new THREE.Vector3(); // 原始目标：原点
+let cameraOffset = new THREE.Vector3();
+let originalDistance = 0;
 
 //相机参数
 const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
@@ -85,8 +90,17 @@ function init() {
 
     //4.动画效果：包括公转、自转等
     function render() { 
-        renderer.render(scene,currentCamera);//每次更新页面都要刷新显示
-        requestAnimationFrame( render);
+        //处理聚焦物体
+        if(focusedObject){
+            //视角锁定
+            const focusedPosition = new THREE.Vector3();
+            focusedObject.getWorldPosition(focusedPosition);
+            controls.target.copy(focusedPosition);
+            //视角跟随
+            currentCamera.position.copy(focusedPosition).add(cameraOffset);
+            //最后还需要update
+            controls.update();
+        }
         //处理自转
         if(CONFIGS.isRotation)
         {
@@ -100,15 +114,49 @@ function init() {
             earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
             moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
         }
-        
+
+        renderer.render(scene,currentCamera);//每次更新页面都要刷新显示
+        requestAnimationFrame( render);
     }
     requestAnimationFrame( render );
 
     // 5. 添加交互控制（鼠标拖拽缩放）
-    const controls = new THREE.OrbitControls(currentCamera, renderer.domElement);
-    controls.enableDamping = true; // 启用阻尼感
+    controls = new THREE.OrbitControls(currentCamera, renderer.domElement);
+    controls.enableDamping = false; // 启用阻尼感
 
     // 6. 添加其它函数
+    //鼠标点击：判断是否和星球相交，如果相交触发事件
+    function onMouseClick(event){
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        raycaster.setFromCamera(pointer, currentCamera);
+        const intersects = raycaster.intersectObjects (objects);
+        if ( intersects.length > 0 ) {//如果有点击到物体，只取第一个点击到的
+            onIntersect(intersects[0].object);
+        }
+        console.log("点击！");  
+    }
+    //点击到星球：进行聚焦，并弹出换肤界面
+    function onIntersect(object){
+        console.log("onIntersect");
+        //如果点击的是当前聚焦的对象：取消聚焦，恢复原本的聚焦目标
+        if(focusedObject === object){
+            controls.target.copy(originalTarget);
+            focusedObject = null;
+            return;
+        }
+        //否则，获取对象坐标和距离
+        const objectPosition = new THREE.Vector3();
+        object.getWorldPosition(objectPosition); 
+        originalTarget.copy(controls.target);//需要保存原本的目标
+        originalDistance = currentCamera.position.distanceTo(objectPosition);
+        //计算位置偏移量（用于让相机保持与聚焦物体相对静止）
+        cameraOffset = currentCamera.position.clone().sub(objectPosition);
+        //设置聚焦目标为该对象
+        focusedObject = object;
+        controls.target.copy(objectPosition);
+    }
     //页面大小改变时：重新设置大小
     function onWindowResize() {
         currentCamera.aspect = window.innerWidth / window.innerHeight;
@@ -133,29 +181,8 @@ function init() {
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
     }
-    //弹窗：弹出换肤界面
-    function onIntersect(object){
-        console.log("onIntersect");
-        if(object instanceof THREE.Mesh){
-            if(object instanceof THREE.SphereGeometry){
-                alert("球体");
-            }
-        }
-    }
-    //鼠标点击：判断是否和星球相交，如果相交触发事件
-    function onMouseClick(event){
-        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-        pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        
-        raycaster.setFromCamera(pointer, currentCamera);
-        const intersects = raycaster.intersectObjects (objects);
-        if ( intersects.length > 0 ) {//如果有点击到物体，只取第一个点击到的
-            onIntersect(intersects[0]);
-        }
-        console.log("点击！");  
-    }
-    //自转的checkbox
-    function onRotationCheckboxClick(checkbox){
+    //自转的checkbox：开启/暂停自转
+    function onRotationCheckboxClick(){
         if(CONFIGS.isRotation == true){
             CONFIGS.isRotation = false;
         }
@@ -163,8 +190,8 @@ function init() {
             CONFIGS.isRotation = true;
         }
     }
-    //公转的checkbox
-    function onRevolutionCheckboxClick(checkbox){
+    //公转的checkbox：开启/暂停公转
+    function onRevolutionCheckboxClick(){
         if(CONFIGS.isRevolution == true){
             CONFIGS.isRevolution = false;
         }
