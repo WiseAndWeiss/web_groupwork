@@ -25,6 +25,7 @@ html, body {
     width: 25%;
     height: 25%;
     background-color: rgba(255,255,255,0.1);
+    display: none; /*初始要隐藏画布*/
 }
 
 #ul-view_control {

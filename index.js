@@ -173,7 +173,9 @@ function init() {
     // 5. 添加交互控制（鼠标拖拽缩放）
     controls = new THREE.OrbitControls(currentCamera, renderer.domElement);
     controls.enableDamping = true; // 启用阻尼感
-
+    controls.dampingFactor = 0.1;
+    controls.rotateSpeed = 0.3;
+    controls.zoomSpeed = 0.5;
     // 6. 添加其它函数
     //鼠标点击：判断是否和星球相交，如果相交触发事件
     function onMouseClick(event){
