@@ -29,5 +29,6 @@ export let CONFIGS = {
     //是否开启自转、公转
     isRotation: true,
     isRevolution: true,
-    
+    //自转/公转的速度控制
+    speed: 1,
 }

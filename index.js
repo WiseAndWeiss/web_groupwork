@@ -36,7 +36,6 @@ function initCamera(){
     //画中画相机的初始化
     pipCamera = new THREE.PerspectiveCamera(45, aspect, near, far)
     currentCamera = freeCamera;
-
 }
 
 function initScene(){//场景的初始化
@@ -138,14 +137,14 @@ function init() {
         controls.update();
         //处理自转
         if(CONFIGS.isRotation){
-            sun.rotation.y += CONSTS.SUN_ROTATION;
-            earth.rotation.z += CONSTS.EARTH_ROTATION;
-            moon.rotation.z += CONSTS.MOON_ROTATION;
+            sun.rotation.y += CONSTS.SUN_ROTATION * CONFIGS.speed;
+            earth.rotation.z += CONSTS.EARTH_ROTATION * CONFIGS.speed;
+            moon.rotation.z += CONSTS.MOON_ROTATION * CONFIGS.speed;
         }
         //处理公转
         if(CONFIGS.isRevolution){ 
-            earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
-            moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
+            earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
+            moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION * CONFIGS.speed;
         }
         //处理阴影
         scene.traverse(function(object) {
@@ -154,17 +153,21 @@ function init() {
             }
         });
         renderer.render(scene,currentCamera);//每次更新页面都要刷新显示
+        //处理日食、月食
         if(currentEclipse!=="")
         {
-            pipCanvas.style.display = "block";
+            if(currentEclipse.startsWith("lunar"))//如果是月食：需要调整相机跟随地球，并锁定月亮
+            {
+                const earthWorldPosition = new THREE.Vector3();
+                const moonWorldPosition = new THREE.Vector3();
+                earth.getWorldPosition(earthWorldPosition);
+                moon.getWorldPosition(moonWorldPosition);
+                pipCamera.position.set(earthWorldPosition.x,earthWorldPosition.y,earthWorldPosition.z);
+                pipCamera.lookAt(moonWorldPosition);
+            }
             pipRenderer.render(scene, pipCamera);
         }
-        else 
-        {
-            pipCanvas.style.display = "none";
-        }
-        
-        requestAnimationFrame( render);
+        requestAnimationFrame( render );
     }
     requestAnimationFrame( render );
 
@@ -266,14 +269,14 @@ function init() {
         currentCamera.updateProjectionMatrix();
         resetFocus();
     }
-    // 重置聚焦状态的函数
+    //重置聚焦状态的函数
     function resetFocus() {
         focusedObject = null;
         updatePlanetName("无");
         controls.target.set(0, 0, 0); // 重置目标到原点
     }
-    //自转的checkbox：开启/暂停自转
-    function onRotationCheckboxClick(){
+    //自转按钮：开启/暂停自转
+    function onRotationButtonClick(){
         if(CONFIGS.isRotation == true){
             CONFIGS.isRotation = false;
         }
@@ -281,14 +284,21 @@ function init() {
             CONFIGS.isRotation = true;
         }
     }
-    //公转的checkbox：开启/暂停公转
-    function onRevolutionCheckboxClick(){
+    //公转按钮：开启/暂停公转
+    function onRevolutionButtonClick(){
         if(CONFIGS.isRevolution == true){
             CONFIGS.isRevolution = false;
         }
         else{
             CONFIGS.isRevolution = true;
         }
+    }
+    //速度控制滑动条：控制自转、公转的运动速度
+    function onSpeedRangeChange(){
+        const speedRange = document.querySelector("#range-speed");
+        CONFIGS.speed = Math.pow(10,speedRange.value);//设置speed
+        const label = document.querySelector('label[for="range-speed"]');
+        label.textContent = "速度控制：×" + CONFIGS.speed;
     }
     //从本地选择材质的按钮
     function onSkinFileChange(event){
@@ -303,7 +313,6 @@ function init() {
             return;
         }
         currentTexture = URL.createObjectURL(file);
-        console.log(currentTexture);
     }
     //将当前材质运用到当前星球
     function onSkinChangeButtonClick(){
@@ -318,10 +327,12 @@ function init() {
     //日食控制（通过设置相机远近实现不同天相）
     function SolarEclipse(pipCamera_x, pipCamera_y, pipCamera_z, state){
       if(currentEclipse === state){ //如果当前正在日食：取消日食
+        pipCanvas.style.display = "none";
         currentEclipse = "";
         CONFIGS.isRevolution = true;
         return;
       }//否则，开启日食
+      pipCanvas.style.display = "block";
       currentEclipse = state;
       CONFIGS.isRevolution = false;
       //日-月-地位置成一条线
@@ -343,16 +354,17 @@ function init() {
     }
     //日偏食按钮
     function onSolarEclipsePartialButtonClick(){
-        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 1, "solar_eclipse_partial");
+        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 2, "solar_eclipse_partial");
     }
     //月食控制（
     function LunarEclipse(pipCamera_x, pipCamera_y ,pipCamera_z, state, moon_x, moon_y, moon_z){ //月食的处理比较特殊：需要添加平行光模拟太阳光线，
         if(currentEclipse === state){ //如果当前正在月食：取消月食
-            document.querySelector("canvas-pip");
+            pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
             return;
         }//否则，开启月食
+        pipCanvas.style.display = "block";
         currentEclipse = state;
         CONFIGS.isRevolution = false;
         //日-地-月位置成一条线
@@ -372,11 +384,11 @@ function init() {
     }
     //月全食按钮
     function onLunarEclipseTotalButtonClick(){
-        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS + 3, 0, 0, "lunar_eclipse_total", 0, - CONSTS.MOON_ORBIT_RADIUS, 0);
+        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS, 0, 0, "lunar_eclipse_total", 0, - CONSTS.MOON_ORBIT_RADIUS, 0);
     }
     //月偏食按钮
     function onLunarEclipsePartialButtonClick(){
-        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS + 1, 0, 1, "lunar_eclipse_partial", - CONSTS.MOON_ORBIT_RADIUS / 2, - CONSTS.MOON_ORBIT_RADIUS / Math.sqrt(4/3), 0);
+        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS, 0, 1, "lunar_eclipse_partial", - CONSTS.MOON_ORBIT_RADIUS / 2, - CONSTS.MOON_ORBIT_RADIUS / Math.sqrt(4/3), 0);
     }
     // 7. 添加事件控制
     document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
@@ -389,9 +401,11 @@ function init() {
         
         document.querySelector("#button-free_camera").addEventListener('click',onFreeCameraButtonClick);
 
-        document.querySelector("#checkbox-rotation").addEventListener('click',onRotationCheckboxClick);
+        document.querySelector("#button-rotation").addEventListener('click',onRotationButtonClick);
 
-        document.querySelector("#checkbox-revolution").addEventListener('click',onRevolutionCheckboxClick);
+        document.querySelector("#button-revolution").addEventListener('click',onRevolutionButtonClick);
+
+        document.querySelector("#range-speed").addEventListener('change',onSpeedRangeChange);
 
         document.querySelector("#file-skin").addEventListener('change',onSkinFileChange);
 

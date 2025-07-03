@@ -21,8 +21,10 @@
             <input type="button" id="button-free_camera">自由视角
         </ul>
         <ul id="ul-move_control">
-            <input type="checkbox" id="checkbox-rotation">停止自转
-            <input type="checkbox" id="checkbox-revolution">停止公转
+            <input type="button" id="button-rotation">开启/停止自转
+            <input type="button" id="button-revolution">开启/停止公转
+            <input type="range" id="range-speed" value="0" min="-3" max="1" step="1">
+            <label for="range-speed">速度控制：×1</label>
         </ul>
         <ul id="ul-eclipse_control">
             <input type="button" id="button-solar_eclipse_total">日全食
