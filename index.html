@@ -13,7 +13,7 @@
     
 </head>
 <body>
-    <canvas id="c"></canvas>
+    <canvas id="canvas-main"></canvas>
     <div id="controls">
         <ul id="ul-view_control">
             <input type="button" id="button-vertical_camera">俯视图
@@ -24,12 +24,19 @@
             <input type="checkbox" id="checkbox-rotation">停止自转
             <input type="checkbox" id="checkbox-revolution">停止公转
         </ul>
+        <ul id="ul-eclipse_control">
+            <input type="button" id="button-solar_eclipse_total">日全食
+            <input type="button" id="button-solar_eclipse_annular">日环食
+            <input type="button" id="button-solar_eclipse_partial">日偏食
+            <input type="button" id="button-lunar_eclipse_total">月全食
+            <input type="button" id="button-lunar_eclipse_partial">月偏食
+        </ul>
     </div>
     <div id="menu">
         当前选中：<p id="focused_name">无</p>
         <input type="file" id="file-skin">选择本地材质
         <input type="button" id="button-skin_change">应用材质
     </div>
-    
+    <canvas id="canvas-pip"></canvas>
 </body>
 </html>

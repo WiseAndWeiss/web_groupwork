@@ -1,53 +1,73 @@
 import {CONSTS,CONFIGS} from './defs.js';
+let currentCamera,verticalCamera,horizontalCamera,freeCamera,pipCamera;//相机
+let scene,renderer,canvas;//场景、渲染器、画布
+let pipCanvas,pipRenderer;//画中画相关
+let objects = [];//交互相关
+let sun,earth,moon;//星球相关
+let controls;//控制相关
+let focusedObject;//聚焦物体
 let raycaster = new THREE.Raycaster();
 let pointer = new THREE.Vector2();
-let currentCamera;
-let scene,renderer;
-let objects = [];
-let sun,earth,moon;
-let controls;
-let focusedObject;
 let originalTarget = new THREE.Vector3(); // 原始目标：原点
 let cameraOffset = new THREE.Vector3();
 let isUserInteracting = false;
 let lastUpdateTime = 0;
 let currentTexture;
+let currentEclipse = "";
 
-//相机参数
-const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
-const aspect = (window.innerWidth / window.innerHeight);  // 宽高比
-const near = 0.1; //可绘区域的近点
-const far = 1000; //可绘区域的远点
-//自由相机的初始化
-const freeCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-freeCamera.position.set(0, 0, 150);
-//垂直相机的初始化
-const verticalCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-verticalCamera.position.set(0, 150, 0);
-verticalCamera.up.set(0, 0, 1);
-verticalCamera.lookAt(0, 0, 0);
-//水平相机的初始化
-const horizontalCamera = new THREE.PerspectiveCamera(fov,aspect,near,far);
-horizontalCamera.position.set(0, 0, 150);
 
-currentCamera = freeCamera;
+function initCamera(){
+    //相机参数
+    const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
+    const aspect = (window.innerWidth / window.innerHeight);  // 宽高比
+    const near = 0.1; //可绘区域的近点
+    const far = 1000; //可绘区域的远点
+    //自由相机的初始化
+    freeCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    freeCamera.position.set(0, 0, 150);
+    //垂直相机的初始化
+    verticalCamera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+    verticalCamera.position.set(0, 150, 0);
+    verticalCamera.up.set(0, 0, 1);
+    verticalCamera.lookAt(0, 0, 0);
+    //水平相机的初始化
+    horizontalCamera = new THREE.PerspectiveCamera(fov,aspect,near,far);
+    horizontalCamera.position.set(0, 0, 150);
+    //画中画相机的初始化
+    pipCamera = new THREE.PerspectiveCamera(45, aspect, near, far)
+    currentCamera = freeCamera;
 
-function init() {
-    //1.初始化操作；包括场景渲染器的初始化
-    //场景的初始化
+}
+
+function initScene(){//场景的初始化
     scene = new THREE.Scene();
-
-    //渲染器的初始化
-    const canvas = document.querySelector('#c');
-    renderer = new THREE.WebGLRenderer({antialias: true, canvas});
-    renderer.setSize(window.innerWidth,window.innerHeight);
-
+    //主渲染器的初始化
+    canvas = document.querySelector('#canvas-main');
+    renderer = new THREE.WebGLRenderer({antialias: true, canvas:canvas});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true; // 需要开启阴影，不然没法显示日/月食
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    //画中画渲染器的初始化
+    pipCanvas = document.querySelector('#canvas-pip');
+    pipRenderer = new THREE.WebGLRenderer( {antialias: true, canvas:pipCanvas});
+    pipRenderer.setSize(window.innerWidth / 4, window.innerHeight / 4);
+    pipRenderer.shadowMap.enabled = true; // 需要开启阴影，不然没法显示日/月食
     //2.添加光源：以太阳为中心的点光源
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
     const pointLight = new THREE.PointLight(0xffffff, 2);//光照的颜色和亮度
+    pointLight.castShadow = true; // 光源投射阴影
+    pointLight.shadow.bias = -0.004; // 减少阴影失真
+    pointLight.shadow.mapSize.width = 4096; // 提高阴影质量
+    pointLight.shadow.mapSize.height = 4096;
     scene.add(pointLight);
+}
 
+function init() {
+    //1.初始化操作；包括场景渲染器的初始化
+    initScene();
+    //2.相机的初始化
+    initCamera();
     //3.添加地球、太阳、月球
     const textureLoader = new THREE.TextureLoader();
     //添加太阳
@@ -62,11 +82,13 @@ function init() {
     const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
     const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //设置材质和放射颜色
     earth = new THREE.Mesh(earthGeometry, earthMaterial);
+    earth.castShadow = true; // 地球投射阴影
+    earth.receiveShadow = true; // 地球接收阴影
     earth.name = "地球";
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
-    const OrbitMaterial = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+    const OrbitMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.2 });
     const earthOrbit = new THREE.Mesh(earthOrbitGeometry,OrbitMaterial);
     earthOrbit.rotation.x = Math.PI / 2;
     scene.add(earthOrbit); 
@@ -87,6 +109,8 @@ function init() {
     const moonTexture = textureLoader.load('./texture/moon.jpg');  
     const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
     moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.castShadow = true; // 月球投射阴影
+    moon.receiveShadow = true; // 月球接收阴影
     moon.name = "月球";
     moon.position.x = CONSTS.MOON_ORBIT_RADIUS;//月球相对月球轨道中心的偏移
     moonOrbit.add(moon);
@@ -103,7 +127,7 @@ function init() {
             const focusedPosition = new THREE.Vector3();
             focusedObject.getWorldPosition(focusedPosition);
             controls.target.copy(focusedPosition);
-            //每个一定时间，更新视角跟随
+            //每隔一定时间，更新视角跟随
             if (!isUserInteracting || now - lastUpdateTime > CONSTS.UPDATE_INTERVAL) {
                 cameraOffset = currentCamera.position.clone().sub(focusedPosition);
                 lastUpdateTime = now;
@@ -113,20 +137,33 @@ function init() {
         //最后还需要update
         controls.update();
         //处理自转
-        if(CONFIGS.isRotation)
-        {
+        if(CONFIGS.isRotation){
             sun.rotation.y += CONSTS.SUN_ROTATION;
             earth.rotation.z += CONSTS.EARTH_ROTATION;
             moon.rotation.z += CONSTS.MOON_ROTATION;
         }
         //处理公转
-        if(CONFIGS.isRevolution)
-        { 
+        if(CONFIGS.isRevolution){ 
             earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION;
             moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION;
         }
-
+        //处理阴影
+        scene.traverse(function(object) {
+            if (object.material) {
+                object.material.needsUpdate = true;
+            }
+        });
         renderer.render(scene,currentCamera);//每次更新页面都要刷新显示
+        if(currentEclipse!=="")
+        {
+            pipCanvas.style.display = "block";
+            pipRenderer.render(scene, pipCamera);
+        }
+        else 
+        {
+            pipCanvas.style.display = "none";
+        }
+        
         requestAnimationFrame( render);
     }
     requestAnimationFrame( render );
@@ -138,6 +175,9 @@ function init() {
     // 6. 添加其它函数
     //鼠标点击：判断是否和星球相交，如果相交触发事件
     function onMouseClick(event){
+        if(currentCamera !== freeCamera){ //只有自由视角时才能选中
+            return;
+        }
         pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
         pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
         
@@ -145,8 +185,7 @@ function init() {
         const intersects = raycaster.intersectObjects (objects);
         if ( intersects.length > 0 ) {//如果有点击到物体，只取第一个点击到的
             onIntersect(intersects[0].object);
-        }
-        console.log("点击！");  
+        } 
     }
     //点击到星球：进行聚焦，并弹出换肤界面
     function onIntersect(object){
@@ -156,8 +195,6 @@ function init() {
             //恢复原本的聚焦目标
             controls.target.copy(originalTarget);
             focusedObject = null;
-            // 恢复阻尼效果
-            controls.enableDamping = true; 
             //更新名称显示
             updatePlanetName("无");
         }
@@ -170,8 +207,6 @@ function init() {
             //设置聚焦目标为该对象
             focusedObject = object;
             controls.target.copy(objectPosition);
-            //取消阻尼效果
-            controls.enableDamping = false;
             //更新名称显示
             updatePlanetName(object.name);
         }
@@ -215,18 +250,27 @@ function init() {
         currentCamera = verticalCamera;
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
+        resetFocus();
     }
     //按下按钮切换为侧视图
     function onHorizontalCameraButtonClick(){
         currentCamera = horizontalCamera;
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
+        resetFocus();
     }
     //按下按钮切换为自由视角
     function onFreeCameraButtonClick(){
         currentCamera = freeCamera;
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
+        resetFocus();
+    }
+    // 重置聚焦状态的函数
+    function resetFocus() {
+        focusedObject = null;
+        updatePlanetName("无");
+        controls.target.set(0, 0, 0); // 重置目标到原点
     }
     //自转的checkbox：开启/暂停自转
     function onRotationCheckboxClick(){
@@ -271,6 +315,69 @@ function init() {
         const newMaterial = new THREE.MeshPhongMaterial({ map: texture });
         focusedObject.material = newMaterial;
     }
+    //日食控制（通过设置相机远近实现不同天相）
+    function SolarEclipse(pipCamera_x, pipCamera_y, pipCamera_z, state){
+      if(currentEclipse === state){ //如果当前正在日食：取消日食
+        currentEclipse = "";
+        CONFIGS.isRevolution = true;
+        return;
+      }//否则，开启日食
+      currentEclipse = state;
+      CONFIGS.isRevolution = false;
+      //日-月-地位置成一条线
+      earthOrbit.rotation.set(Math.PI / 2, 0, 0);
+      earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
+      moonOrbit.rotation.set(0, 0, Math.PI / 2);
+      moon.position.set(0, CONSTS.MOON_ORBIT_RADIUS , 0);
+      //相机设置：地球看向太阳
+      pipCamera.position.set(pipCamera_x, pipCamera_y, pipCamera_z); 
+      pipCamera.lookAt(0,0,0);
+    }
+    //日全食按钮
+    function onSolarEclipseTotalButtonClick(){
+        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 3, 0, 0, "solar_eclipse_total");
+    }
+    //日环食
+    function onSolarEclipseAnnularButtonClick(){
+        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 0, "solar_eclipse_annular");
+    }
+    //日偏食按钮
+    function onSolarEclipsePartialButtonClick(){
+        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 1, "solar_eclipse_partial");
+    }
+    //月食控制（
+    function LunarEclipse(pipCamera_x, pipCamera_y ,pipCamera_z, state, moon_x, moon_y, moon_z){ //月食的处理比较特殊：需要添加平行光模拟太阳光线，
+        if(currentEclipse === state){ //如果当前正在月食：取消月食
+            document.querySelector("canvas-pip");
+            currentEclipse = "";
+            CONFIGS.isRevolution = true;
+            return;
+        }//否则，开启月食
+        currentEclipse = state;
+        CONFIGS.isRevolution = false;
+        //日-地-月位置成一条线
+        earthOrbit.rotation.set(Math.PI / 2, 0, 0);
+        earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
+        moonOrbit.rotation.set(0, 0, Math.PI / 2);
+        moon.position.set(moon_x, moon_y, moon_z);
+        //获取月球的世界坐标
+        const moonWorldPosition = new THREE.Vector3();
+        moon.getWorldPosition(moonWorldPosition);
+        //相机设置：地球看向月球
+        pipCamera.position.set(pipCamera_x, pipCamera_y, pipCamera_z); 
+        pipCamera.lookAt(moonWorldPosition);
+        // 提高阴影质量（月食时特别重要）
+        renderer.shadowMap.needsUpdate = true;
+        pipRenderer.shadowMap.needsUpdate = true;
+    }
+    //月全食按钮
+    function onLunarEclipseTotalButtonClick(){
+        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS + 3, 0, 0, "lunar_eclipse_total", 0, - CONSTS.MOON_ORBIT_RADIUS, 0);
+    }
+    //月偏食按钮
+    function onLunarEclipsePartialButtonClick(){
+        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS + 1, 0, 1, "lunar_eclipse_partial", - CONSTS.MOON_ORBIT_RADIUS / 2, - CONSTS.MOON_ORBIT_RADIUS / Math.sqrt(4/3), 0);
+    }
     // 7. 添加事件控制
     document.addEventListener('DOMContentLoaded', function(){ //绑定一些按钮
 
@@ -289,6 +396,16 @@ function init() {
         document.querySelector("#file-skin").addEventListener('change',onSkinFileChange);
 
         document.querySelector("#button-skin_change").addEventListener('click',onSkinChangeButtonClick);
+
+        document.querySelector("#button-solar_eclipse_total").addEventListener('click',onSolarEclipseTotalButtonClick);
+
+        document.querySelector("#button-solar_eclipse_annular").addEventListener('click',onSolarEclipseAnnularButtonClick);
+
+        document.querySelector("#button-solar_eclipse_partial").addEventListener('click',onSolarEclipsePartialButtonClick);
+
+        document.querySelector("#button-lunar_eclipse_total").addEventListener('click',onLunarEclipseTotalButtonClick);
+        
+        document.querySelector("#button-lunar_eclipse_partial").addEventListener('click',onLunarEclipsePartialButtonClick);
 
         document.addEventListener('click', onMouseClick);
 

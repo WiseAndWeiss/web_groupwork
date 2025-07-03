@@ -1,4 +1,5 @@
 export const CONSTS = {
+    
     //最小、最大缩放距离限制
     MIN_CAMERA_DISTANCE: 1,
     MAX_CAMERA_DISTANCE: 1000,
@@ -25,6 +26,8 @@ export const CONSTS = {
 };
 
 export let CONFIGS = {
+    //是否开启自转、公转
     isRotation: true,
     isRevolution: true,
+    
 }
