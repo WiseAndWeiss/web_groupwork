@@ -54,7 +54,7 @@ function initScene(){//场景的初始化
     //2.添加光源：以太阳为中心的点光源
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
-    const pointLight = new THREE.PointLight(0xffffff, 2);//光照的颜色和亮度
+    const pointLight = new THREE.PointLight(0xffffff, 1);//光照的颜色和亮度
     pointLight.castShadow = true; // 光源投射阴影
     pointLight.shadow.bias = -0.004; // 减少阴影失真
     pointLight.shadow.mapSize.width = 4096; // 提高阴影质量
@@ -102,7 +102,6 @@ function init() {
     const moonOrbit = new THREE.Mesh(moonOrbitGeometry,OrbitMaterial);
     moonOrbit.rotation.z = Math.PI / 2; // 关键修改：绕X轴旋转90度
     earthSystem.add(moonOrbit);
-    //moonOrbit.position.x = 0;轨道中心在地月系统的中心
     //添加月球
     const moonGeometry = new THREE.SphereGeometry(CONSTS.MOON_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); 
     const moonTexture = textureLoader.load('./texture/moon.jpg');  
