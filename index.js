@@ -14,7 +14,16 @@ let isUserInteracting = false;
 let lastUpdateTime = 0;
 let currentTexture;
 let currentEclipse = "";
+let cameraLerpTarget = null; //相机动画的目标对象       
+let cameraLerpProgress = 0;        
+let cameraLerpDuration = 0.7; 
+let cameraLerpStartTime = 0;
+let cameraLerpFrom = null; //用于插值动画的起点         
+let initialCameraPosition, initialCameraTarget; //初始自由相机与target
 
+//地球自转
+const tilt = THREE.MathUtils.degToRad(23.4);
+const earthAxis = new THREE.Vector3(Math.sin(tilt), 0, Math.cos(tilt)).normalize();
 
 function initCamera(){
     //相机参数
@@ -36,6 +45,9 @@ function initCamera(){
     //画中画相机的初始化
     pipCamera = new THREE.PerspectiveCamera(45, aspect, near, far)
     currentCamera = freeCamera;
+    //刚进入页面的初始状态
+    initialCameraPosition = freeCamera.position.clone();
+    initialCameraTarget = new THREE.Vector3(0, 0, 0); // 默认target为原点
 }
 
 function initScene(){//场景的初始化
@@ -84,6 +96,10 @@ function init() {
     earth.castShadow = true; // 地球投射阴影
     earth.receiveShadow = true; // 地球接收阴影
     earth.name = "地球";
+    //让贴图“北极”对准自定义地轴方向
+    const yAxis = new THREE.Vector3(0, -1, 0);
+    const alignQuat = new THREE.Quaternion().setFromUnitVectors(yAxis, earthAxis);
+    earth.quaternion.copy(alignQuat); // 
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -119,16 +135,47 @@ function init() {
     function render() { 
         const now = Date.now();
         scene.updateMatrixWorld(true);
-        //处理聚焦物体
-        if(focusedObject){
-            //视角锁定
+        //处理聚焦物体与动画过渡
+        if (cameraLerpTarget) {
+            // t为进度
+            let t = (Date.now() - cameraLerpStartTime) / (cameraLerpDuration * 1000);
+            if (t > 1) t = 1;
+                cameraLerpProgress = t;
+
+            // 计算实时目标
+            let realTarget, realCameraEnd;
+            if (cameraLerpTarget.isFollow && focusedObject) {
+                // 目标和终点要实时读取
+                realTarget = new THREE.Vector3();
+                focusedObject.getWorldPosition(realTarget);
+                //保持与目标天体的相对offset不变，计算相机最终应该到达的位置
+                realCameraEnd = realTarget.clone().add(cameraLerpTarget.offset);
+            } else {
+                //取消聚焦时使用静态目标参数
+                realTarget = cameraLerpTarget.target;
+                realCameraEnd = cameraLerpTarget.position;
+            }
+
+            // 插值实现平滑过渡
+            currentCamera.position.lerpVectors(cameraLerpFrom.position, realCameraEnd, t);
+            controls.target.lerpVectors(cameraLerpFrom.target, realTarget, t);
+
+            // 动画完成
+            if (t >= 1) {
+                currentCamera.position.copy(realCameraEnd);
+                controls.target.copy(realTarget);
+                cameraLerpTarget = null;
+                cameraLerpFrom = null;
+            }
+        } else if (focusedObject) {
+            // 没有动画时，持续跟随天体
             const focusedPosition = new THREE.Vector3();
             focusedObject.getWorldPosition(focusedPosition);
             controls.target.copy(focusedPosition);
-            //每隔一定时间，更新视角跟随
-            if (!isUserInteracting || now - lastUpdateTime > CONSTS.UPDATE_INTERVAL) {
+            //刷新天体位置
+            if (!isUserInteracting || Date.now() - lastUpdateTime > CONSTS.UPDATE_INTERVAL) {
                 cameraOffset = currentCamera.position.clone().sub(focusedPosition);
-                lastUpdateTime = now;
+                lastUpdateTime = Date.now();
             }
             currentCamera.position.copy(focusedPosition).add(cameraOffset);
         }
@@ -137,7 +184,12 @@ function init() {
         //处理自转
         if(CONFIGS.isRotation){
             sun.rotation.y += CONSTS.SUN_ROTATION * CONFIGS.speed;
-            earth.rotation.z += CONSTS.EARTH_ROTATION * CONFIGS.speed;
+             // 地球用四元数自转
+            const rotationAngle = CONSTS.EARTH_ROTATION * CONFIGS.speed;
+            earth.quaternion.multiplyQuaternions(
+                new THREE.Quaternion().setFromAxisAngle(earthAxis, rotationAngle),
+                earth.quaternion
+            );
             moon.rotation.z += CONSTS.MOON_ROTATION * CONFIGS.speed;
         }
         //处理公转
@@ -196,25 +248,31 @@ function init() {
         console.log("onIntersect");
         //如果点击的是当前聚焦的对象：取消聚焦，恢复原本的聚焦目标
         if(focusedObject === object){
-            //恢复原本的聚焦目标
-            controls.target.copy(originalTarget);
-            focusedObject = null;
-            //更新名称显示
-            updatePlanetName("无");
+            // 用动画返回
+            resetFocus(); 
         }
-        else{ //否则，获取对象坐标和距离     
+        else {
+            // 聚焦新天体
             const objectPosition = new THREE.Vector3();
-            object.getWorldPosition(objectPosition); 
-            originalTarget.copy(controls.target);//需要保存原本的目标
-            //计算位置偏移量（用于让相机保持与聚焦物体相对静止）
-            cameraOffset = currentCamera.position.clone().sub(objectPosition);
-            //设置聚焦目标为该对象
+            object.getWorldPosition(objectPosition);
+            // offset：当前相机与天体之间的相对位置
+            const offset = currentCamera.position.clone().sub(objectPosition);
+            //动画起点
+            cameraLerpFrom = {
+                position: currentCamera.position.clone(),
+                target: controls.target.clone(),
+            };
+            //终点始终跟随天体
+            cameraLerpTarget = {
+                isFollow: true,
+                offset: offset.clone() 
+            };
+            cameraLerpStartTime = Date.now();
+            cameraLerpProgress = 0;
+
             focusedObject = object;
-            controls.target.copy(objectPosition);
-            //更新名称显示
             updatePlanetName(object.name);
-        }
-        
+        }   
     }
     //显示当前星球的名字 
     function updatePlanetName(name){
@@ -254,7 +312,7 @@ function init() {
         currentCamera = verticalCamera;
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
-        resetFocus();
+        resetFocusForVertical();
     }
     //按下按钮切换为侧视图
     function onHorizontalCameraButtonClick(){
@@ -268,14 +326,63 @@ function init() {
         currentCamera = freeCamera;
         currentCamera.aspect = window.innerWidth / window.innerHeight;
         currentCamera.updateProjectionMatrix();
-        resetFocus();
+        resetFocusForFree();
     }
     //重置聚焦状态的函数
-    function resetFocus() {
+   function resetFocus() {
+        //保存当前相机的位置和target，作为动画起点
+        cameraLerpFrom = {
+            position: currentCamera.position.clone(),
+            target: controls.target.clone(),
+        };
+        //初始相机位置与target
+        cameraLerpTarget = {
+            isFollow: false,
+            position: initialCameraPosition.clone(),
+            target: initialCameraTarget.clone()
+        };
+        cameraLerpStartTime = Date.now();
+        cameraLerpProgress = 0;
+
         focusedObject = null;
         updatePlanetName("无");
-        controls.target.set(0, 0, 0); // 重置目标到原点
     }
+    function resetFocusForVertical() {
+    // 俯视相机初始位置和目标
+    const verticalPosition = new THREE.Vector3(0, 150, 0);  // y轴正方向
+    const verticalTarget = new THREE.Vector3(0, 0, 0);
+
+    // 设置相机位置和up
+    verticalCamera.position.copy(verticalPosition);
+    verticalCamera.up.set(0, 0, 1);
+    verticalCamera.lookAt(verticalTarget);
+
+    // 更新controls
+    controls.object = verticalCamera;
+    controls.target.copy(verticalTarget);
+    controls.update();
+
+    // 清除聚焦对象
+    focusedObject = null;
+    updatePlanetName("无");
+}
+function resetFocusForFree() {
+    // 自由视角初始位置、up、目标
+    const freePosition = new THREE.Vector3(0, 0, 150);
+    const freeTarget = new THREE.Vector3(0, 0, 0);
+
+    freeCamera.position.copy(freePosition);
+    freeCamera.up.set(0, 1, 0);  // three.js默认up
+    freeCamera.lookAt(freeTarget);
+
+    controls.object = freeCamera;
+    controls.target.copy(freeTarget);
+    controls.update();
+
+    focusedObject = null;
+    updatePlanetName("无");
+}
+
     //自转按钮：开启/暂停自转
     function onRotationButtonClick(){
         if(CONFIGS.isRotation == true){
@@ -318,6 +425,10 @@ function init() {
     //将当前材质运用到当前星球
     function onSkinChangeButtonClick(){
         if(!focusedObject){
+            return;
+        }
+        if (!currentTexture) {
+            alert("请选择图片");
             return;
         }
         //加载currentTexture到focusedObject的材质
