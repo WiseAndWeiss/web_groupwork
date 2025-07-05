@@ -96,10 +96,20 @@ function init() {
     earth.castShadow = true; // 地球投射阴影
     earth.receiveShadow = true; // 地球接收阴影
     earth.name = "地球";
-    //让贴图“北极”对准自定义地轴方向
+    
+    // 创建地轴容器和自转容器
+    const earthAxisContainer = new THREE.Object3D(); // 用于保持地轴方向
+    const earthRotation = new THREE.Object3D(); // 用于地球自转
+    
+    // 调整地轴方向
     const yAxis = new THREE.Vector3(0, -1, 0);
     const alignQuat = new THREE.Quaternion().setFromUnitVectors(yAxis, earthAxis);
-    earth.quaternion.copy(alignQuat); // 
+    earthRotation.quaternion.copy(alignQuat); 
+    earthRotation.add(earth);
+    
+    // 将地轴容器添加到场景
+    earthAxisContainer.add(earthRotation);
+    
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -111,7 +121,8 @@ function init() {
     const earthSystem = new THREE.Object3D();
     earthOrbit.add(earthSystem);
     earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
-    earthSystem.add(earth);
+    earthSystem.add(earthAxisContainer); // 将地轴容器添加到地月系统
+    
     //添加月球轨道
     const moonOrbitGeometry = 
         new THREE.TorusGeometry(CONSTS.MOON_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -184,17 +195,15 @@ function init() {
         //处理自转
         if(CONFIGS.isRotation){
             sun.rotation.y += CONSTS.SUN_ROTATION * CONFIGS.speed;
-             // 地球用四元数自转
-            const rotationAngle = CONSTS.EARTH_ROTATION * CONFIGS.speed;
-            earth.quaternion.multiplyQuaternions(
-                new THREE.Quaternion().setFromAxisAngle(earthAxis, rotationAngle),
-                earth.quaternion
-            );
+            // 地球自转（绕自身轴）
+            earthRotation.rotation.y += CONSTS.EARTH_ROTATION * CONFIGS.speed;
             moon.rotation.z += CONSTS.MOON_ROTATION * CONFIGS.speed;
         }
         //处理公转
         if(CONFIGS.isRevolution){ 
             earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
+            // 地轴反向旋转以保持空间指向
+            earthAxisContainer.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
             moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION * CONFIGS.speed;
         }
         //处理阴影
