@@ -74,6 +74,12 @@ function initScene() {//场景的初始化
     scene.add(pointLight);
 }
 
+// 更新公转按钮文本
+function updateRevolutionButtonText() {
+    const revolutionButton = document.getElementById("button-revolution");
+    revolutionButton.textContent = CONFIGS.isRevolution ? "停止公转" : "开启公转";
+}
+
 function init() {
     //1.初始化操作；包括场景渲染器的初始化
     initScene();
@@ -399,6 +405,9 @@ function init() {
         else {
             CONFIGS.isRotation = true;
         }
+        // 更新自转按钮文本
+        const rotationButton = document.getElementById("button-rotation");
+        rotationButton.textContent = CONFIGS.isRotation ? "停止自转" : "开启自转";
     }
     //公转按钮：开启/暂停公转
     function onRevolutionButtonClick() {
@@ -408,6 +417,7 @@ function init() {
         else {
             CONFIGS.isRevolution = true;
         }
+        updateRevolutionButtonText(); // 更新按钮文本
     }
     //速度控制滑动条：控制自转、公转的运动速度
     function onSpeedRangeChange() {
@@ -450,11 +460,13 @@ function init() {
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
+            updateRevolutionButtonText(); // 更新按钮文本
             return;
         }//否则，开启日食
         pipCanvas.style.display = "block";
         currentEclipse = state;
         CONFIGS.isRevolution = false;
+        updateRevolutionButtonText(); // 更新按钮文本
         //日-月-地位置成一条线
         earthOrbit.rotation.set(Math.PI / 2, 0, 0);
         earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
@@ -482,11 +494,13 @@ function init() {
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
+            updateRevolutionButtonText(); // 更新按钮文本
             return;
         }//否则，开启月食
         pipCanvas.style.display = "block";
         currentEclipse = state;
         CONFIGS.isRevolution = false;
+        updateRevolutionButtonText(); // 更新按钮文本
         //日-地-月位置成一条线
         earthOrbit.rotation.set(Math.PI / 2, 0, 0);
         earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
@@ -523,7 +537,6 @@ function init() {
             btn.addEventListener("click", () => {
                 viewButtons.forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
-                // 可加入切换视角逻辑
             });
         });
 
@@ -543,36 +556,14 @@ function init() {
                 } else {
                     eclipseButtons.forEach(b => b.classList.remove("active"));
                     btn.classList.add("active");
-                    // 可加入日食效果逻辑
                 }
             });
         });
 
-        // ---- 运动控制按钮：切换文字 ----
-        const toggleButtons = [
-            {
-                id: "button-rotation",
-                textOn: "开启自转",
-                textOff: "停止自转",
-                isOn: false
-            },
-            {
-                id: "button-revolution",
-                textOn: "开启公转",
-                textOff: "停止公转",
-                isOn: false
-            }
-        ];
-
-        toggleButtons.forEach(control => {
-            const btn = document.getElementById(control.id);
-            btn.textContent = control.textOff;
-
-            btn.addEventListener("click", () => {
-                control.isOn = !control.isOn;
-                btn.textContent = control.isOn ? control.textOn : control.textOff;
-            });
-        });
+        // 初始化按钮文本
+        updateRevolutionButtonText();
+        const rotationButton = document.getElementById("button-rotation");
+        rotationButton.textContent = CONFIGS.isRotation ? "停止自转" : "开启自转";
     }
 
     // 7. 添加事件控制
