@@ -129,12 +129,15 @@ function init() {
     earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
     earthSystem.add(earthAxisContainer); // 将地轴容器添加到地月系统
 
+    const moonOrbitContainer = new THREE.Object3D();
+    // 设置白道面与黄道面的夹角 (5.14度)
+    moonOrbitContainer.rotation.x = THREE.MathUtils.degToRad(5.14);
+    earthSystem.add(moonOrbitContainer);
     //添加月球轨道
     const moonOrbitGeometry =
         new THREE.TorusGeometry(CONSTS.MOON_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
     const moonOrbit = new THREE.Mesh(moonOrbitGeometry, OrbitMaterial);
-    moonOrbit.rotation.z = Math.PI / 2; // 关键修改：绕X轴旋转90度
-    earthSystem.add(moonOrbit);
+    moonOrbitContainer.add(moonOrbit);
     //添加月球
     const moonGeometry = new THREE.SphereGeometry(CONSTS.MOON_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS);
     const moonTexture = textureLoader.load('./texture/moon.jpg');
@@ -144,6 +147,7 @@ function init() {
     moon.receiveShadow = true; // 月球接收阴影
     moon.name = "月球";
     moon.position.x = CONSTS.MOON_ORBIT_RADIUS;//月球相对月球轨道中心的偏移
+    moon.rotation.z = Math.PI; 
     moonOrbit.add(moon);
     //添加星体到Objects里
     objects.push(sun, earth, moon);
@@ -203,14 +207,13 @@ function init() {
             sun.rotation.y += CONSTS.SUN_ROTATION * CONFIGS.speed;
             // 地球自转（绕自身轴）
             earthRotation.rotation.y += CONSTS.EARTH_ROTATION * CONFIGS.speed;
-            moon.rotation.z += CONSTS.MOON_ROTATION * CONFIGS.speed;
         }
         //处理公转
         if (CONFIGS.isRevolution) {
-            earthOrbit.rotation.z += CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
+            earthOrbit.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
             // 地轴反向旋转以保持空间指向
             earthAxisContainer.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
-            moonOrbit.rotation.z += CONSTS.MOON_REVOLUTION * CONFIGS.speed;
+            moonOrbit.rotation.z -= CONSTS.MOON_REVOLUTION * CONFIGS.speed;
         }
         //处理阴影
         scene.traverse(function (object) {
