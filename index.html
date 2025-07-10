@@ -9,8 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
     <script type="module" src="./index.js"></script>
-    <link href="./index.css" rel="stylesheet" type="text/css">
-    </link>
+    <link href="./index.css" rel="stylesheet" type="text/css"></link>
     <title>Document</title>
 
 </head>
@@ -18,7 +17,6 @@
 <body>
     <canvas id="canvas-main"></canvas>
 
-    <!-- 添加左侧触发区域 -->
     <div id="left-trigger"></div>
     <div id="arrow-indicator">▸</div>
 
@@ -36,18 +34,53 @@
                 <li><button id="button-rotation">开启/停止自转</button></li>
                 <li><button id="button-revolution">开启/停止公转</button></li>
                 <li>
-                    <label for="range-speed">速度控制：×1</label>
-                    <input type="range" id="range-speed" value="0" min="-3" max="1" step="1">
+                    <label for="range-speed">速度控制：<span id="speed-display">×1</span></label>
+                    <input type="range" id="range-speed" value="2" min="0" max="4" step="1">
+                    <div class="speed-numbers">
+                        <span>×0.25</span>
+                        <span>×0.5</span>
+                        <span>×1</span>
+                        <span>×2</span>
+                        <span>×5</span>
+                    </div>
                 </li>
             </ul>
 
-            <h3>日食控制</h3>
+            <h3 style="margin-top: 38px;">日食控制</h3>
             <ul id="ul-eclipse_control">
                 <li><button id="button-solar_eclipse_total">日全食</button></li>
                 <li><button id="button-solar_eclipse_annular">日环食</button></li>
                 <li><button id="button-solar_eclipse_partial">日偏食</button></li>
                 <li><button id="button-lunar_eclipse_total">月全食</button></li>
                 <li><button id="button-lunar_eclipse_partial">月偏食</button></li>
+            </ul>
+                
+            <h3>参数配置</h3>
+            <ul id="param-config">
+                <div class="param-item">
+                    <label for="earth_orbit_radius">地球轨道半径:</label>
+                    <input type="number" id="earth_orbit_radius" value="100" step="any">
+                </div>
+                <div class="param-item">
+                    <label for="moon_orbit_radius">月球轨道半径:</label>
+                    <input type="number" id="moon_orbit_radius" value="12" step="any">
+                </div>
+                <div class="param-item">
+                    <label for="sun_rotation">太阳自转速度:</label>
+                    <input type="number" id="sun_rotation" value="1" step="any" min="0" >
+                </div>
+                <div class="param-item">
+                    <label for="earth_rotation">地球自转速度:</label>
+                    <input type="number" id="earth_rotation" value="10" step="any" min="0" >
+                </div>
+                <div class="param-item">
+                    <label for="earth_revolution">地球公转速度:</label>
+                    <input type="number" id="earth_revolution" value="2" step="any" min="0" >
+                </div>
+                <div class="param-item">
+                    <label for="moon_revolution">月球公转速度:</label>
+                    <input type="number" id="moon_revolution" value="5" step="any" min="0" >
+                </div>
             </ul>
         </div>
 

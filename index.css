@@ -1,6 +1,5 @@
 :root {
     --primary-color: #00f2ff;
-    --secondary-color: #ff00f2;
     --bg-color: #0a0a12;
     --menu-bg: rgba(10, 10, 25, 0.9);
     --text-color: #e0e0e0;
@@ -95,7 +94,7 @@ body {
 /* 菜单标题样式 */
 #left-menu h3 {
     color: var(--primary-color);
-    margin: 25px 0 15px;
+    margin: 20px 0 15px;
     font-size: 1.2em;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -186,13 +185,14 @@ body {
 }
 
 #left-menu input[type="range"] {
-    width: 100%;
+    width: 95%;
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
     -webkit-appearance: none;
     border-radius: 2px;
     outline: none;
-    margin: 15px 0;
+    margin: 15px auto;
+    display: block;
 }
 
 #left-menu input[type="range"]::-webkit-slider-thumb {
@@ -203,6 +203,60 @@ body {
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 0 5px var(--primary-color);
+}
+
+#left-menu .speed-numbers {
+    display: flex;
+    position: absolute;
+    width: 303px;
+    left: -15px;
+    justify-content: space-between;
+    font-size: 0.8em;
+    color: var(--primary-color);
+    margin-top: -10px;
+}
+
+#left-menu .speed-numbers span {
+    flex: 3;
+    text-align: center;
+}
+
+.param-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid rgba(0, 242, 255, 0.3);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    background: rgba(0, 242, 255, 0.05);
+}
+
+.param-item label {
+    flex: 1;
+    color: var(--text-color);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    font-size: 1.0em;
+}
+
+.param-item input {
+    flex: 1;
+    max-width: 100px;
+    padding: 4px 6px;
+    border: 1px solid rgba(0, 242, 255, 0.5);
+    border-radius: 3px;
+    background: var(--bg-color);
+    color: var(--primary-color);
+    font-size: 0.9em;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.param-item input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 8px var(--primary-color);
 }
 
 /* 画中画样式 */
