@@ -425,9 +425,14 @@ function init() {
     //速度控制滑动条：控制自转、公转的运动速度
     function onSpeedRangeChange() {
         const speedRange = document.querySelector("#range-speed");
-        CONFIGS.speed = Math.pow(10, speedRange.value);//设置speed
-        const label = document.querySelector('label[for="range-speed"]');
-        label.textContent = "速度控制：×" + CONFIGS.speed;
+        const speedDisplay = document.querySelector("#speed-display");
+
+        const speedMultipliers = [0.25, 0.5, 1, 2, 5];
+        const index = parseInt(speedRange.value);
+        const multiplier = speedMultipliers[index];
+
+        CONFIGS.speed = multiplier;
+        speedDisplay.textContent = "×" + multiplier;
     }
     //从本地选择材质的按钮
     function onSkinFileChange(event) {
@@ -568,6 +573,85 @@ function init() {
         const rotationButton = document.getElementById("button-rotation");
         rotationButton.textContent = CONFIGS.isRotation ? "停止自转" : "开启自转";
     }
+    // 添加参数输入框
+    function setupParameterInputs() {
+        // 需要放大显示（x1000）的参数
+        const scaledParams = {
+            sun_rotation: 'SUN_ROTATION',
+            earth_rotation: 'EARTH_ROTATION',
+            earth_revolution: 'EARTH_REVOLUTION',
+            moon_revolution: 'MOON_REVOLUTION'
+        };
+
+        // 不需要放大显示的参数（轨道半径）
+        const unscaledParams = {
+            earth_orbit_radius: 'EARTH_ORBIT_RADIUS',
+            moon_orbit_radius: 'MOON_ORBIT_RADIUS'
+        };
+
+        // 初始化放大参数的输入框值（显示值 = 实际值 × 1000）
+        for (const [inputId, configKey] of Object.entries(scaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.value = CONSTS[configKey] * 1000;
+            }
+        }
+
+        // 初始化非放大参数的输入框值（直接显示实际值）
+        for (const [inputId, configKey] of Object.entries(unscaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.value = CONSTS[configKey];
+            }
+        }
+
+        // 监听放大参数的输入事件（存储值 = 输入值 ÷ 1000）
+        for (const [inputId, configKey] of Object.entries(scaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.addEventListener('input', () => {
+                    const displayedValue = parseFloat(inputElement.value);
+                    if (!isNaN(displayedValue)) {
+                        CONSTS[configKey] = displayedValue / 1000; // 存储实际值
+                    }
+                });
+            }
+        }
+
+        // 监听非放大参数的输入事件（直接存储）
+        for (const [inputId, configKey] of Object.entries(unscaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.addEventListener('input', () => {
+                    const value = parseFloat(inputElement.value);
+                    if (!isNaN(value)) {
+                        CONSTS[configKey] = value;
+
+                        // 更新轨道几何体（仅针对轨道参数）
+                        if (configKey === 'EARTH_ORBIT_RADIUS') {
+                            earthOrbit.geometry.dispose();
+                            earthOrbit.geometry = new THREE.TorusGeometry(
+                                CONSTS.EARTH_ORBIT_RADIUS,
+                                CONSTS.ORBIT_WIDTH,
+                                CONSTS.TORUS_SEGS,
+                                CONSTS.TORUS_SEGS
+                            );
+                            earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
+                        } else if (configKey === 'MOON_ORBIT_RADIUS') {
+                            moonOrbit.geometry.dispose();
+                            moonOrbit.geometry = new THREE.TorusGeometry(
+                                CONSTS.MOON_ORBIT_RADIUS,
+                                CONSTS.ORBIT_WIDTH,
+                                CONSTS.TORUS_SEGS,
+                                CONSTS.TORUS_SEGS
+                            );
+                            moon.position.x = CONSTS.MOON_ORBIT_RADIUS;
+                        }
+                    }
+                });
+            }
+        }
+    }
 
     // 7. 添加事件控制
     document.addEventListener('DOMContentLoaded', function () { //绑定一些按钮
@@ -607,6 +691,8 @@ function init() {
         controls.addEventListener('end', onControlsEnd);
 
         initButtonControls();
+
+        setupParameterInputs();
     })
 }
 
