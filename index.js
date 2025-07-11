@@ -22,6 +22,14 @@ let cameraLerpFrom = null; //用于插值动画的起点
 let initialCameraPosition, initialCameraTarget; //初始自由相机与target
 let isMoonRotating = false;
 
+// 添加全局变量跟踪天象状态和初始参数
+let isEclipseActive = false;
+let initialConsts = {};
+
+// 添加固定相机位置变量
+let solarEclipseTotalCameraPos, solarEclipseAnnularCameraPos, solarEclipsePartialCameraPos;
+let lunarEclipseTotalCameraPos, lunarEclipsePartialCameraPos;
+
 function initCamera() {
     //相机参数
     const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
@@ -78,6 +86,16 @@ function updateRevolutionButtonText() {
 }
 
 function init() {
+    // 保存初始参数
+    initialConsts = JSON.parse(JSON.stringify(CONSTS));
+    
+    // 初始化固定相机位置
+    solarEclipseTotalCameraPos = new THREE.Vector3(initialConsts.EARTH_ORBIT_RADIUS - 3, 0, 0);
+    solarEclipseAnnularCameraPos = new THREE.Vector3(initialConsts.EARTH_ORBIT_RADIUS - 1, 0, 0);
+    solarEclipsePartialCameraPos = new THREE.Vector3(initialConsts.EARTH_ORBIT_RADIUS - 1, 0, 2);
+    lunarEclipseTotalCameraPos = new THREE.Vector3(initialConsts.EARTH_ORBIT_RADIUS, 0, 0);
+    lunarEclipsePartialCameraPos = new THREE.Vector3(initialConsts.EARTH_ORBIT_RADIUS, 0, 1);
+    
     //1.初始化操作；包括场景渲染器的初始化
     initScene();
     //2.相机的初始化
@@ -477,76 +495,176 @@ function init() {
         const newMaterial = new THREE.MeshPhongMaterial({ map: texture });
         focusedObject.material = newMaterial;
     }
-    //日食控制（通过设置相机远近实现不同天相）
-    function SolarEclipse(pipCamera_x, pipCamera_y, pipCamera_z, state) {
+    
+    // 参数重置函数
+    function resetParameters() {
+        // 恢复所有参数到初始值
+        Object.keys(initialConsts).forEach(key => {
+            CONSTS[key] = initialConsts[key];
+        });
+        
+        // 更新轨道几何体
+        earthOrbit.geometry.dispose();
+        earthOrbit.geometry = new THREE.TorusGeometry(
+            CONSTS.EARTH_ORBIT_RADIUS,
+            CONSTS.ORBIT_WIDTH,
+            CONSTS.TORUS_SEGS,
+            CONSTS.TORUS_SEGS
+        );
+        earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
+        
+        moonOrbit.geometry.dispose();
+        moonOrbit.geometry = new THREE.TorusGeometry(
+            CONSTS.MOON_ORBIT_RADIUS,
+            CONSTS.ORBIT_WIDTH,
+            CONSTS.TORUS_SEGS,
+            CONSTS.TORUS_SEGS
+        );
+        moon.position.x = CONSTS.MOON_ORBIT_RADIUS;
+        
+        // 更新输入框显示
+        updateParameterInputs();
+    }
+    
+    // 更新参数输入框的函数
+    function updateParameterInputs() {
+        // 需要放大显示（x1000）的参数
+        const scaledParams = {
+            sun_rotation: 'SUN_ROTATION',
+            earth_rotation: 'EARTH_ROTATION',
+            earth_revolution: 'EARTH_REVOLUTION',
+            moon_revolution: 'MOON_REVOLUTION'
+        };
+
+        // 不需要放大显示的参数（轨道半径）
+        const unscaledParams = {
+            earth_orbit_radius: 'EARTH_ORBIT_RADIUS',
+            moon_orbit_radius: 'MOON_ORBIT_RADIUS'
+        };
+
+        // 更新放大参数的输入框值
+        for (const [inputId, configKey] of Object.entries(scaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.value = CONSTS[configKey] * 1000;
+            }
+        }
+
+        // 更新非放大参数的输入框值
+        for (const [inputId, configKey] of Object.entries(unscaledParams)) {
+            const inputElement = document.getElementById(inputId);
+            if (inputElement) {
+                inputElement.value = CONSTS[configKey];
+            }
+        }
+    }
+
+    //日食控制（使用固定相机位置）
+    function SolarEclipse(cameraPos, state) {
         if (currentEclipse === state) { //如果当前正在日食：取消日食
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
             updateRevolutionButtonText(); // 更新按钮文本
+            isEclipseActive = false; // 取消天象状态
+            // 移除禁用状态
+            document.querySelector(".param-section").classList.remove("disabled-params");
             return;
         }//否则，开启日食
+        
+        // 重置参数到初始状态
+        resetParameters();
+        
+        isEclipseActive = true; // 设置天象状态
         pipCanvas.style.display = "block";
         currentEclipse = state;
         CONFIGS.isRevolution = false;
         updateRevolutionButtonText(); // 更新按钮文本
+        // 添加禁用状态
+        document.querySelector(".param-section").classList.add("disabled-params");
         //日-月-地位置成一条线
         earthOrbit.rotation.set(Math.PI / 2, 0, 0);
         earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
         moonOrbit.rotation.set(0, 0, Math.PI / 2);
         moon.position.set(0, CONSTS.MOON_ORBIT_RADIUS, 0);
-        //相机设置：地球看向太阳
-        pipCamera.position.set(pipCamera_x, pipCamera_y, pipCamera_z);
+        
+        // 使用固定相机位置
+        pipCamera.position.copy(cameraPos);
         pipCamera.lookAt(0, 0, 0);
     }
-    //日全食按钮
-    function onSolarEclipseTotalButtonClick() {
-        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 3, 0, 0, "solar_eclipse_total");
-    }
-    //日环食
-    function onSolarEclipseAnnularButtonClick() {
-        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 0, "solar_eclipse_annular");
-    }
-    //日偏食按钮
-    function onSolarEclipsePartialButtonClick() {
-        SolarEclipse(CONSTS.EARTH_ORBIT_RADIUS - 1, 0, 2, "solar_eclipse_partial");
-    }
-    //月食控制（
-    function LunarEclipse(pipCamera_x, pipCamera_y, pipCamera_z, state, moon_x, moon_y, moon_z) { //月食的处理比较特殊：需要添加平行光模拟太阳光线，
+
+    //月食控制（使用固定相机位置）
+    function LunarEclipse(cameraPos, state, moonPos) { 
         if (currentEclipse === state) { //如果当前正在月食：取消月食
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
             updateRevolutionButtonText(); // 更新按钮文本
+            isEclipseActive = false; // 取消天象状态
+            // 移除禁用状态
+            document.querySelector(".param-section").classList.remove("disabled-params");
             return;
         }//否则，开启月食
+        
+        // 重置参数到初始状态
+        resetParameters();
+        
+        isEclipseActive = true; // 设置天象状态
         pipCanvas.style.display = "block";
         currentEclipse = state;
         CONFIGS.isRevolution = false;
         updateRevolutionButtonText(); // 更新按钮文本
+        
+        // 添加禁用状态
+        document.querySelector(".param-section").classList.add("disabled-params");
+        
         //日-地-月位置成一条线
         earthOrbit.rotation.set(Math.PI / 2, 0, 0);
         earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
         moonOrbit.rotation.set(0, 0, Math.PI / 2);
-        moon.position.set(moon_x, moon_y, moon_z);
+        moon.position.copy(moonPos);
+        
+        // 使用固定相机位置
+        pipCamera.position.copy(cameraPos);
+        
         //获取月球的世界坐标
         const moonWorldPosition = new THREE.Vector3();
         moon.getWorldPosition(moonWorldPosition);
-        //相机设置：地球看向月球
-        pipCamera.position.set(pipCamera_x, pipCamera_y, pipCamera_z);
         pipCamera.lookAt(moonWorldPosition);
+        
         // 提高阴影质量（月食时特别重要）
         renderer.shadowMap.needsUpdate = true;
         pipRenderer.shadowMap.needsUpdate = true;
     }
+    
+    //日全食按钮
+    function onSolarEclipseTotalButtonClick() {
+        SolarEclipse(solarEclipseTotalCameraPos.clone(), "solar_eclipse_total");
+    }
+    //日环食
+    function onSolarEclipseAnnularButtonClick() {
+        SolarEclipse(solarEclipseAnnularCameraPos.clone(), "solar_eclipse_annular");
+    }
+    //日偏食按钮
+    function onSolarEclipsePartialButtonClick() {
+        SolarEclipse(solarEclipsePartialCameraPos.clone(), "solar_eclipse_partial");
+    }
     //月全食按钮
     function onLunarEclipseTotalButtonClick() {
-        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS, 0, 0, "lunar_eclipse_total", 0, - CONSTS.MOON_ORBIT_RADIUS, 0);
+        const moonPos = new THREE.Vector3(0, -initialConsts.MOON_ORBIT_RADIUS, 0);
+        LunarEclipse(lunarEclipseTotalCameraPos.clone(), "lunar_eclipse_total", moonPos);
     }
     //月偏食按钮
     function onLunarEclipsePartialButtonClick() {
-        LunarEclipse(CONSTS.EARTH_ORBIT_RADIUS, 0, 1, "lunar_eclipse_partial", - CONSTS.MOON_ORBIT_RADIUS / 2, - CONSTS.MOON_ORBIT_RADIUS / Math.sqrt(4 / 3), 0);
+        const moonOffset = initialConsts.MOON_ORBIT_RADIUS;
+        const moonPos = new THREE.Vector3(
+            -moonOffset / 2,
+            -moonOffset / Math.sqrt(4 / 3),
+            0
+        );
+        LunarEclipse(lunarEclipsePartialCameraPos.clone(), "lunar_eclipse_partial", moonPos);
     }
+    
     //初始化按钮控制
     function initButtonControls() {
         // ---- 视图控制按钮：互斥激活 ----

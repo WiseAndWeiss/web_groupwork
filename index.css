@@ -5,6 +5,7 @@
     --text-color: #e0e0e0;
     --highlight: rgba(0, 242, 255, 0.3);
     --border-glow: 0 0 10px var(--primary-color);
+    --disabled-color: #555; /* 添加禁用状态颜色 */
 }
 
 html,
@@ -298,4 +299,31 @@ body {
     #left-menu {
         width: 280px;
     }
+}
+
+/* 添加禁用状态样式 */
+.param-section.disabled-params .param-section-title,
+.param-section.disabled-params .param-section-title::after,
+.param-section.disabled-params .param-item,
+.param-section.disabled-params .param-item label,
+.param-section.disabled-params .param-item input {
+    color: var(--disabled-color);
+    border-color: var(--disabled-color);
+}
+
+.param-section.disabled-params .param-section-title::after {
+    background: linear-gradient(90deg, var(--disabled-color), transparent);
+}
+
+.param-section.disabled-params .param-item {
+    background: rgba(85, 85, 85, 0.05);
+}
+
+.param-section.disabled-params .param-item input {
+    background: #1a1a1a;
+    pointer-events: none;
+}
+
+.param-section.disabled-params input {
+    pointer-events: none;
 }
