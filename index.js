@@ -20,10 +20,7 @@ let cameraLerpDuration = 0.7;
 let cameraLerpStartTime = 0;
 let cameraLerpFrom = null; //用于插值动画的起点         
 let initialCameraPosition, initialCameraTarget; //初始自由相机与target
-
-//地球自转
-const tilt = THREE.MathUtils.degToRad(23.4);
-const earthAxis = new THREE.Vector3(Math.sin(tilt), 0, Math.cos(tilt)).normalize();
+let isMoonRotating = false;
 
 function initCamera() {
     //相机参数
@@ -108,6 +105,8 @@ function init() {
     const earthRotation = new THREE.Object3D(); // 用于地球自转
 
     // 调整地轴方向
+    const tilt = THREE.MathUtils.degToRad(23.4);
+    const earthAxis = new THREE.Vector3(Math.sin(tilt), 0 , Math.cos(tilt)).normalize();
     const yAxis = new THREE.Vector3(0, -1, 0);
     const alignQuat = new THREE.Quaternion().setFromUnitVectors(yAxis, earthAxis);
     earthRotation.quaternion.copy(alignQuat);
@@ -211,9 +210,17 @@ function init() {
         //处理公转
         if (CONFIGS.isRevolution) {
             earthOrbit.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
-            // 地轴反向旋转以保持空间指向
-            earthAxisContainer.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
             moonOrbit.rotation.z -= CONSTS.MOON_REVOLUTION * CONFIGS.speed;
+        }
+         // 当停止自转或停止公转时，开启月球自转
+        isMoonRotating = (!CONFIGS.isRotation || !CONFIGS.isRevolution);
+        // 如果公转和自转都停止，则月球也停止
+        if (!CONFIGS.isRotation && !CONFIGS.isRevolution) {
+            isMoonRotating = false;
+        }
+        // 月球自转逻辑（方向与公转相反）
+        if (isMoonRotating) {
+            moon.rotation.z += CONSTS.MOON_REVOLUTION * CONFIGS.speed;
         }
         //处理阴影
         scene.traverse(function (object) {
@@ -411,6 +418,10 @@ function init() {
         // 更新自转按钮文本
         const rotationButton = document.getElementById("button-rotation");
         rotationButton.textContent = CONFIGS.isRotation ? "停止自转" : "开启自转";
+         isMoonRotating = (!CONFIGS.isRotation || !CONFIGS.isRevolution);
+        if (!CONFIGS.isRotation && !CONFIGS.isRevolution) {
+            isMoonRotating = false;
+        }
     }
     //公转按钮：开启/暂停公转
     function onRevolutionButtonClick() {
@@ -421,6 +432,10 @@ function init() {
             CONFIGS.isRevolution = true;
         }
         updateRevolutionButtonText(); // 更新按钮文本
+        isMoonRotating = (!CONFIGS.isRotation || !CONFIGS.isRevolution);
+        if (!CONFIGS.isRotation && !CONFIGS.isRevolution) {
+            isMoonRotating = false;
+        }
     }
     //速度控制滑动条：控制自转、公转的运动速度
     function onSpeedRangeChange() {
