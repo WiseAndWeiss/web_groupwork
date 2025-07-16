@@ -21,14 +21,18 @@ let cameraLerpStartTime = 0;
 let cameraLerpFrom = null; //用于插值动画的起点         
 let initialCameraPosition, initialCameraTarget; //初始自由相机与target
 let isMoonRotating = false;
-
 // 添加全局变量跟踪天象状态和初始参数
 let isEclipseActive = false;
 let initialConsts = {};
-
 // 添加固定相机位置变量
 let solarEclipseTotalCameraPos, solarEclipseAnnularCameraPos, solarEclipsePartialCameraPos;
 let lunarEclipseTotalCameraPos, lunarEclipsePartialCameraPos;
+//重置皮肤按钮使用
+let initialTextures = {
+    sun: './texture/sun.jpg',
+    earth: './texture/earth.jpg',
+    moon: './texture/moon.jpg'
+};
 
 function initCamera() {
     //相机参数
@@ -102,16 +106,18 @@ function init() {
     initCamera();
     //3.添加地球、太阳、月球
     const textureLoader = new THREE.TextureLoader();
+     // 存储初始皮肤
+    const sunTexture = textureLoader.load(initialTextures.sun);
+    const earthTexture = textureLoader.load(initialTextures.earth);
+    const moonTexture = textureLoader.load(initialTextures.moon);
     //添加太阳
     const sunGeometry = new THREE.SphereGeometry(CONSTS.SUN_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS);
-    const sunTexture = textureLoader.load('./texture/sun.jpg');
     const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
     sun = new THREE.Mesh(sunGeometry, sunMaterial);
     sun.name = "太阳";
     scene.add(sun);//太阳直接位于正中间
     //添加地球
     const earthGeometry = new THREE.SphereGeometry(CONSTS.EARTH_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS); //几何体：球体，参数为半径、经度分段、纬度分段 
-    const earthTexture = textureLoader.load('./texture/earth.jpg');  //加载材质     
     const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture }); //设置材质和放射颜色
     earth = new THREE.Mesh(earthGeometry, earthMaterial);
     earth.castShadow = true; // 地球投射阴影
@@ -157,7 +163,6 @@ function init() {
     moonOrbitContainer.add(moonOrbit);
     //添加月球
     const moonGeometry = new THREE.SphereGeometry(CONSTS.MOON_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS);
-    const moonTexture = textureLoader.load('./texture/moon.jpg');
     const moonMaterial = new THREE.MeshPhongMaterial({ map: moonTexture }); //材质  
     moon = new THREE.Mesh(moonGeometry, moonMaterial);
     moon.castShadow = true; // 月球投射阴影
@@ -495,7 +500,35 @@ function init() {
         const newMaterial = new THREE.MeshPhongMaterial({ map: texture });
         focusedObject.material = newMaterial;
     }
-    
+    // 恢复默认皮肤功能
+    function restoreDefaultSkin() {
+        if (!focusedObject) {
+            alert("请先选择一个天体");
+            return;
+        }
+        
+        let texturePath;
+        // 根据选中的天体确定要恢复的纹理
+        if (focusedObject === sun) {
+            texturePath = initialTextures.sun;
+        } else if (focusedObject === earth) {
+            texturePath = initialTextures.earth;
+        } else if (focusedObject === moon) {
+            texturePath = initialTextures.moon;
+        } else {
+            return;
+        }
+        
+        // 加载并应用默认纹理
+        const texture = textureLoader.load(texturePath);
+        const newMaterial = focusedObject === sun 
+            ? new THREE.MeshBasicMaterial({ map: texture })
+            : new THREE.MeshPhongMaterial({ map: texture });
+        
+        focusedObject.material = newMaterial;
+        alert("已恢复默认皮肤");
+    }
+
     // 参数重置函数
     function resetParameters() {
         // 恢复所有参数到初始值
@@ -790,6 +823,9 @@ function init() {
     document.addEventListener('DOMContentLoaded', function () { //绑定一些按钮
 
         window.addEventListener('resize', onWindowResize);
+
+        // 添加恢复默认皮肤按钮的事件监听
+        document.querySelector("#button-skin_restore").addEventListener('click', restoreDefaultSkin);
 
         document.querySelector("#button-vertical_camera").addEventListener('click', onVerticalCameraButtonClick);
 
