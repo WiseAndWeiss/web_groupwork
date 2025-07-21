@@ -8,7 +8,6 @@ let controls;//控制相关
 let focusedObject;//聚焦物体
 let raycaster = new THREE.Raycaster();
 let pointer = new THREE.Vector2();
-let originalTarget = new THREE.Vector3(); // 原始目标：原点
 let cameraOffset = new THREE.Vector3();
 let isUserInteracting = false;
 let lastUpdateTime = 0;
@@ -545,7 +544,9 @@ function init() {
             CONSTS.TORUS_SEGS
         );
         earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
-        
+        earthSystem.position.y = 0;
+        earthSystem.position.z = 0;
+
         moonOrbit.geometry.dispose();
         moonOrbit.geometry = new THREE.TorusGeometry(
             CONSTS.MOON_ORBIT_RADIUS,
@@ -554,7 +555,8 @@ function init() {
             CONSTS.TORUS_SEGS
         );
         moon.position.x = CONSTS.MOON_ORBIT_RADIUS;
-        
+        moon.position.y = 0;
+        moon.position.z = 0;
         // 更新输入框显示
         updateParameterInputs();
     }
@@ -598,6 +600,8 @@ function init() {
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
+            // 重置参数到初始状态
+            resetParameters();
             updateRevolutionButtonText(); // 更新按钮文本
             isEclipseActive = false; // 取消天象状态
             // 移除禁用状态
@@ -607,7 +611,7 @@ function init() {
         
         // 重置参数到初始状态
         resetParameters();
-        
+
         isEclipseActive = true; // 设置天象状态
         pipCanvas.style.display = "block";
         currentEclipse = state;
@@ -632,6 +636,8 @@ function init() {
             pipCanvas.style.display = "none";
             currentEclipse = "";
             CONFIGS.isRevolution = true;
+            // 重置参数到初始状态
+            resetParameters();
             updateRevolutionButtonText(); // 更新按钮文本
             isEclipseActive = false; // 取消天象状态
             // 移除禁用状态
@@ -641,7 +647,6 @@ function init() {
         
         // 重置参数到初始状态
         resetParameters();
-        
         isEclipseActive = true; // 设置天象状态
         pipCanvas.style.display = "block";
         currentEclipse = state;
