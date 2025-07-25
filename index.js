@@ -33,6 +33,12 @@ let initialTextures = {
     moon: './texture/moon.jpg'
 };
 
+// 地轴倾斜角度（23.4度）
+let earthTilt = THREE.MathUtils.degToRad(66.6);
+
+// 添加新的地球公转容器
+let earthOrbitContainer; 
+
 function initCamera() {
     //相机参数
     const fov = 75; //摄像机的广角(角度制，Three.js其他部分都是弧度制)
@@ -109,6 +115,7 @@ function init() {
     const sunTexture = textureLoader.load(initialTextures.sun);
     const earthTexture = textureLoader.load(initialTextures.earth);
     const moonTexture = textureLoader.load(initialTextures.moon);
+    earthTexture.flipY = false;  
     //添加太阳
     const sunGeometry = new THREE.SphereGeometry(CONSTS.SUN_RADIUS, CONSTS.SPHERE_SEGS, CONSTS.SPHERE_SEGS);
     const sunMaterial = new THREE.MeshBasicMaterial({ map: sunTexture });
@@ -123,21 +130,17 @@ function init() {
     earth.receiveShadow = true; // 地球接收阴影
     earth.name = "地球";
 
-    // 创建地轴容器和自转容器
-    const earthAxisContainer = new THREE.Object3D(); // 用于保持地轴方向
-    const earthRotation = new THREE.Object3D(); // 用于地球自转
-
-    // 调整地轴方向
-    const tilt = THREE.MathUtils.degToRad(23.4);
-    const earthAxis = new THREE.Vector3(Math.sin(tilt), 0 , Math.cos(tilt)).normalize();
-    const yAxis = new THREE.Vector3(0, -1, 0);
-    const alignQuat = new THREE.Quaternion().setFromUnitVectors(yAxis, earthAxis);
-    earthRotation.quaternion.copy(alignQuat);
-    earthRotation.add(earth);
-
-    // 将地轴容器添加到场景
+    //重构地球层级结构 
+    //创建地轴容器（用于保持地轴倾斜）
+    const earthAxisContainer = new THREE.Object3D();
+    //设置地轴倾斜（23.4度）
+    earthAxisContainer.rotation.x = earthTilt;
+    
+    //创建地球自转容器
+    const earthRotation = new THREE.Object3D();
     earthAxisContainer.add(earthRotation);
-
+    earthRotation.add(earth);
+    
     //添加地球轨道(用于公转操作)
     const earthOrbitGeometry =
         new THREE.TorusGeometry(CONSTS.EARTH_ORBIT_RADIUS, CONSTS.ORBIT_WIDTH, CONSTS.TORUS_SEGS, CONSTS.TORUS_SEGS);
@@ -145,14 +148,21 @@ function init() {
     const earthOrbit = new THREE.Mesh(earthOrbitGeometry, OrbitMaterial);
     earthOrbit.rotation.x = Math.PI / 2;
     scene.add(earthOrbit);
-    //添加地月系统(需要保证地球公转和自转相互不干扰，必须设置这样的系统)
+    
+    // 添加地月系统(需要保证地球公转和自转相互不干扰，必须设置这样的系统)
     const earthSystem = new THREE.Object3D();
     earthOrbit.add(earthSystem);
     earthSystem.position.x = CONSTS.EARTH_ORBIT_RADIUS;
-    earthSystem.add(earthAxisContainer); // 将地轴容器添加到地月系统
+    
+    //创建地球公转容器
+    earthOrbitContainer = new THREE.Object3D();
+    earthSystem.add(earthOrbitContainer);
+    
+    //将地轴容器添加到地球公转容器中
+    earthOrbitContainer.add(earthAxisContainer);
 
+    // 添加月球轨道容器（设置白道面倾斜5.14度）
     const moonOrbitContainer = new THREE.Object3D();
-    // 设置白道面与黄道面的夹角 (5.14度)
     moonOrbitContainer.rotation.x = THREE.MathUtils.degToRad(5.14);
     earthSystem.add(moonOrbitContainer);
     //添加月球轨道
@@ -232,6 +242,12 @@ function init() {
         //处理公转
         if (CONFIGS.isRevolution) {
             earthOrbit.rotation.z -= CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
+            
+            //添加反向旋转以保持地轴方向不变
+            if (earthOrbitContainer) {
+                earthOrbitContainer.rotation.z += CONSTS.EARTH_REVOLUTION * CONFIGS.speed;
+            }
+            
             moonOrbit.rotation.z -= CONSTS.MOON_REVOLUTION * CONFIGS.speed;
         }
          // 当停止自转或停止公转时，开启月球自转
@@ -520,6 +536,9 @@ function init() {
         
         // 加载并应用默认纹理
         const texture = textureLoader.load(texturePath);
+        if (focusedObject === earth) {
+            texture.flipY = false;  
+        }
         const newMaterial = focusedObject === sun 
             ? new THREE.MeshBasicMaterial({ map: texture })
             : new THREE.MeshPhongMaterial({ map: texture });
@@ -557,6 +576,12 @@ function init() {
         moon.position.x = CONSTS.MOON_ORBIT_RADIUS;
         moon.position.y = 0;
         moon.position.z = 0;
+        
+        //重置地球公转容器的旋转
+        if (earthOrbitContainer) {
+            earthOrbitContainer.rotation.set(0, 0, 0);
+        }
+        
         // 更新输入框显示
         updateParameterInputs();
     }
@@ -625,6 +650,14 @@ function init() {
         moonOrbit.rotation.set(0, 0, Math.PI / 2);
         moon.position.set(0, CONSTS.MOON_ORBIT_RADIUS, 0);
         
+        //在日食/月食中保持地轴倾斜
+        earthAxisContainer.rotation.x = earthTilt;
+        
+        //重置地球公转容器的旋转
+        if (earthOrbitContainer) {
+            earthOrbitContainer.rotation.set(0, 0, 0);
+        }
+        
         // 使用固定相机位置
         pipCamera.position.copy(cameraPos);
         pipCamera.lookAt(0, 0, 0);
@@ -661,6 +694,14 @@ function init() {
         earthSystem.position.set(CONSTS.EARTH_ORBIT_RADIUS, 0, 0);
         moonOrbit.rotation.set(0, 0, Math.PI / 2);
         moon.position.copy(moonPos);
+        
+        //在日食/月食中保持地轴倾斜
+        earthAxisContainer.rotation.x = earthTilt;
+        
+        //重置地球公转容器的旋转
+        if (earthOrbitContainer) {
+            earthOrbitContainer.rotation.set(0, 0, 0);
+        }
         
         // 使用固定相机位置
         pipCamera.position.copy(cameraPos);
